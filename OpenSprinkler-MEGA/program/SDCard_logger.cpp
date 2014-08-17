@@ -6,7 +6,7 @@
 
 #include "SDCard_logger.h"
 
-//#define ENABLE_SERIAL_DEBUG 1
+#define ENABLE_SERIAL_DEBUG 1
 
 // External references
 extern BufferFiller bfill;

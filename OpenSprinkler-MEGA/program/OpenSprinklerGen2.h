@@ -54,7 +54,6 @@ class OpenSprinkler {
 public:
 
   // ====== Data Members ======
-  static LiquidCrystal lcd;
   static StatusBits status;
   static byte nboards, nstations;
   static OptionStruct options[];  // option values, max, name, and flag
@@ -103,31 +102,7 @@ public:
   static void eeprom_string_set(int start_addr, char* buf);
   static void eeprom_string_get(int start_addr, char* buf);
 
-  // -- LCD functions --
-  static void lcd_print_pgm(PGM_P PROGMEM str);           // print a program memory string
-  static void lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line);
-  static void lcd_print_time(byte line);                  // print current time
-  static void lcd_print_memory(byte line);                // print current free memory and an animated character to show activity
-  static void lcd_print_ip(const byte *ip, int http_port);// print ip and port number
-  static void lcd_print_station(byte line, char c);       // print station bits of the board selected by display_board
-
-  // -- Button and UI functions --
-  static byte button_read(byte waitmode); // Read button value. options for 'waitmodes' are:
-  // BUTTON_WAIT_NONE, BUTTON_WAIT_RELEASE, BUTTON_WAIT_HOLD
-  // return values are 'OR'ed with flags
-  // check defines.h for details
-
-  // -- UI functions --
-  static void ui_set_options(int oid);    // ui for setting options (oid-> starting option index)
-
 private:
-  static void lcd_print_option(int i);  // print an option to the lcd
-  static void lcd_print_2digit(int v);  // print a integer in 2 digits
-  static byte button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding);
-
-  // ===== Added for Freetronics LCD Shield =====
-  static byte button_sample();          // new function to sample analog button input
-  // ===== Added for Freetronics LCD Shield =====
 };
 
 #endif

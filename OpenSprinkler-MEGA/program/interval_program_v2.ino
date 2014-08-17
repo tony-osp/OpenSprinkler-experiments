@@ -29,6 +29,8 @@
 #include <SD.h>
 #include "SDCard_logger.h"
 
+#include "LocalUI.h"
+
 #include <limits.h>
 #include <OpenSprinklerGen2.h>
 #include "program.h"
@@ -74,69 +76,20 @@ ProgramData pd;       // ProgramdData object
 SDLogger  sdlog;
 
 // ====== UI defines ======
-static char ui_anim_chars[3] = {'.', 'o', 'O'};
+OSLocalUI  localUI;
 
-// poll button press
-void button_poll() {
-
-  // read button, if something is pressed, wait till release
-  byte button = svc.button_read(BUTTON_WAIT_HOLD);
-
-  if (!(button & BUTTON_FLAG_DOWN)) return;  // repond only to button down events
-
-  switch (button & BUTTON_MASK) {
-  case BUTTON_1:
-    if (button & BUTTON_FLAG_HOLD) {
-      // hold button 1 -> start operation
-      svc.enable();
-    } 
-    else {
-      // click button 1 -> display ip address and port number
-      svc.lcd_print_ip(ether.myip, ether.hisport);
-      delay(DISPLAY_MSG_MS);
-    }
-    break;
-
-  case BUTTON_2:
-    if (button & BUTTON_FLAG_HOLD) {
-      // hold button 2 -> disable operation
-      svc.disable();
-    } 
-    else {
-      // click button 2 -> display gateway ip address and port number
-      svc.lcd_print_ip(ether.gwip, 0);
-      delay(DISPLAY_MSG_MS);
-    }
-    break;
-
-  case BUTTON_3:
-    if (button & BUTTON_FLAG_HOLD) {
-      // hold button 3 -> reboot
-      svc.button_read(BUTTON_WAIT_RELEASE);
-      svc.reboot();
-    } 
-    else {
-      // click button 3 -> switch board display (cycle through master and all extension boards)
-      svc.status.display_board = (svc.status.display_board + 1) % (svc.nboards);
-    }
-    break;
-  }
-}
 
 // ======================
 // Arduino Setup Function
 // ======================
 void setup() { 
 
-//
-//***AP***
-//  Starting logger
-//
-   sdlog.begin();
+   sdlog.begin();             // start logger
+   localUI.begin();           // start local (LCD) UI
 
-  svc.begin();          // OpenSprinkler init
-  svc.options_setup();  // Setup options
-  pd.init();            // ProgramData init
+  svc.begin();                 // OpenSprinkler init
+  svc.options_setup();   // Setup options
+  pd.init();                       // ProgramData init
 
   // calculate http port number
   myport = (int)(svc.options[OPTION_HTTPPORT_1].value<<8) + (int)svc.options[OPTION_HTTPPORT_0].value;
@@ -145,32 +98,29 @@ void setup() {
   // if rtc exists, sets it as time sync source
   setSyncProvider(svc.status.has_rtc ? RTC.get : NULL);
   delay(500);
-  svc.lcd_print_time(0);  // display time to LCD
-  svc.lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
+  localUI.lcd_print_line_clear_pgm(PSTR("Connecting..."), 1);
 
   svc.status.network_fails = 1;
 
   if (svc.start_network(mymac, myport)) {  // initialize network    
     svc.status.network_fails = 0;
   } 
-  
 
   delay(500);
   svc.apply_all_station_bits(); // reset station bits
 
-  perform_ntp_sync(now());
+  perform_ntp_sync(now());    // sync time
 
-//  svc.lcd_print_time(0);  // display time to LCD
-   
   // ===== Added for Auto Reboot =====
   // wdt_enable(WDTO_4S);  // enabled watchdog timer    
   if(AUTO_REBOOT)
       Alarm.alarmRepeat(REBOOT_HR,REBOOT_MIN,REBOOT_SEC, svc.reboot);      
   // ===== Added for Auto Reboot ===== 
 
-   sdlog.start_logger(PSTR("Logger started"));
+   localUI.set_mode(OSUI_MODE_HOME);  // set to HOME mode, page 0
+   localUI.resume();
 
-  svc.lcd_print_time(0);  // display time to LCD
+   sdlog.start_logger(PSTR("Logger started"));
 
 //  Serial.begin(115200);
 //  Serial.println("OpenSprinkler started!");
@@ -206,14 +156,13 @@ void loop()
   }
   // ======================================
 
-  button_poll();    // process button press
+  localUI.loop();    // main UI loop. This includes button handling and local LCD display
 
   // if 1 second has passed
   time_t curr_time = now();      
   if (last_time != curr_time) {
 
     last_time = curr_time;
-    svc.lcd_print_time(0);       // print time
 
     // ====== Check raindelay status ======
     if (svc.status.rain_delayed) {
@@ -374,12 +323,6 @@ void loop()
     // activate/deactivate valves
     svc.apply_all_station_bits();
 
-    // process LCD display
-    if(SHOW_MEMORY)
-      svc.lcd_print_memory(1);
-    else
-      svc.lcd_print_station(1, ui_anim_chars[curr_time%3]);
-
     // check network connection
     check_network(curr_time);
 
@@ -433,37 +376,6 @@ void check_network(time_t curr_time) {
     return;
   }
 
-  // ===== Added for W5100 =====
-  
-/*
-  // check network condition periodically
-  if (curr_time - last_check_time > CHECK_NETWORK_INTERVAL) 
-  {
-    last_check_time = curr_time;
-
-    // ping gateway ip
-    ether.clientIcmpRequest(ether.gwip);
-
-    unsigned long start = millis();
-    boolean failed = true;
-    // wait at most PING_TIMEOUT milliseconds for ping result
-    do {
-      ether.packetLoop(ether.packetReceive());
-      if (ether.packetLoopIcmpCheckReply(ether.gwip)) {
-        failed = false;
-        break;
-      }
-    } 
-    while(millis() - start < PING_TIMEOUT);
-    if (failed)  svc.status.network_fails++;
-    else svc.status.network_fails=0;
-    // if failed more than 2 times in a row, reconnect
-    if (svc.status.network_fails>2&&svc.options[OPTION_NETFAIL_RECONNECT].value) {
-      //svc.lcd_print_line_clear_pgm(PSTR("Reconnecting..."),0);
-      svc.start_network(mymac, myport);
-      //svc.status.network_fails=0;
-    }
-.*/
   // check network condition periodically
   if (curr_time - last_check_time > CHECK_NETWORK_INTERVAL) 
   {

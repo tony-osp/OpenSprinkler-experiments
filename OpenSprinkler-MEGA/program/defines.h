@@ -125,6 +125,19 @@ OS_OPTION_t;
 ///#define PIN_LCD_RS         8    // LCD rs pin - default = 19
 ///#define PIN_LCD_EN         9    // LCD enable pin - default = 18
 
+// This is my 1284P Bobuino version
+
+///LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
+//LiquidCrystal lcd(23, 22, 27, 26, 25, 24);    // On 1284p I'm using these additional pins for LCD
+
+//#define PIN_LCD_D4         27  
+//#define PIN_LCD_D5         26  
+//#define PIN_LCD_D6         25  
+//#define PIN_LCD_D7         24  
+//#define PIN_LCD_RS         23  
+//#define PIN_LCD_EN         22  
+
+
 // This is the Freetronics shield on a different pinout
 
 //#define PIN_LCD_D4         27    // LCD d4 pin - default = 20
@@ -135,14 +148,19 @@ OS_OPTION_t;
 //#define PIN_LCD_EN         22    // LCD enable pin - default = 18
 
 
-//This is my large-screen LCD
+//This is my large-screen LCD on MEGA
 
-#define PIN_LCD_D4         24    // LCD d4 pin - default = 20
+#define PIN_LCD_D4         24    // LCD d4 pin - default = 2
 #define PIN_LCD_D5         25    // LCD d5 pin - default = 21
 #define PIN_LCD_D6         26    // LCD d6 pin - default = 22
 #define PIN_LCD_D7         27    // LCD d7 pin - default = 23
 #define PIN_LCD_RS         22    // LCD rs pin - default = 19
 #define PIN_LCD_EN         23    // LCD enable pin - default = 18
+
+// LCD size definitions
+
+#define LOCAL_UI_LCD_X		16
+#define LOCAL_UI_LCD_Y		2
 
 
 #define PIN_LCD_BACKLIGHT  3     // LCD backlight pin - default = 12
@@ -155,31 +173,32 @@ OS_OPTION_t;
  #define PIN_BUTTON_1      A0    // button 1
  #define PIN_BUTTON_2      A1    // button 2
  #define PIN_BUTTON_3      A2    // button 3 
- #define PIN_BUTTON_4      A3    // button 4  // RED button
+ #define PIN_BUTTON_4      A3    // button 4 
 
-// ADC readings expected for the 5 buttons on the ADC input
-//#define BUTTON_ADC_PIN    A0     // A0 is the button ADC input
-//#define RIGHT_10BIT_ADC    0    // right
-//#define UP_10BIT_ADC     145    // up
-//#define DOWN_10BIT_ADC   329    // down
-//#define LEFT_10BIT_ADC   505    // left
-//#define SELECT_10BIT_ADC 741    // select
-//#define BUTTONHYSTERESIS  10    // hysteresis for valid button sensing window
+// switch which input method to use - 1==Analog, undefined - Digital buttons
+//#define ANALOG_KEY_INPUT  1
 
-#define BUTTON_RIGHT              1  // 
-#define BUTTON_UP                 2  // 
-#define BUTTON_DOWN               3  // 
-#define BUTTON_LEFT               4  // 
-#define BUTTON_SELECT             5  // 
+#define KEY_ANALOG_CHANNEL 1
+
+
 
 // ===== Added for Freetronics LCD Shield =====
 
 #endif 
 
+#define KEY_DEBOUNCE_DELAY  50
+#define KEY_HOLD_DELAY             1200
+#define KEY_REPEAT_INTERVAL  200
+
+#define PIN_INVERTED_BUTTONS  1
+
+
+
 // ====== Button Defines ======
 #define BUTTON_1            0x01
 #define BUTTON_2            0x02
 #define BUTTON_3            0x04
+#define BUTTON_4            0x08
 
 // button status values
 #define BUTTON_NONE         0x00  // no button pressed

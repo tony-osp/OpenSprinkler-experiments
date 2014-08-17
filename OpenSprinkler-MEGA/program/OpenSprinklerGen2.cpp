@@ -7,10 +7,10 @@
 
 #include "OpenSprinklerGen2.h"
 #include "SDCard_logger.h"
+#include "LocalUI.h"
 
+extern OSLocalUI  localUI;    // reference to the localUI (defined in interval_program_v2
 
-// Declare static data members
-LiquidCrystal OpenSprinkler::lcd(PIN_LCD_RS, PIN_LCD_EN, PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7);
 StatusBits OpenSprinkler::status;
 byte OpenSprinkler::nboards;
 byte OpenSprinkler::nstations;
@@ -89,24 +89,6 @@ OptionStruct OpenSprinkler::options[NUM_OPTIONS] = {
   {0,   1,   _str_reset,OPFLAG_SETUP_EDIT  }
 };
 
-// Weekday display strings
-prog_char str_day0[] PROGMEM = "Mon";
-prog_char str_day1[] PROGMEM = "Tue";
-prog_char str_day2[] PROGMEM = "Wed";
-prog_char str_day3[] PROGMEM = "Thu";
-prog_char str_day4[] PROGMEM = "Fri";
-prog_char str_day5[] PROGMEM = "Sat";
-prog_char str_day6[] PROGMEM = "Sun";
-
-char* OpenSprinkler::days_str[7] = {
-  str_day0,
-  str_day1,
-  str_day2,
-  str_day3,
-  str_day4,
-  str_day5,
-  str_day6
-};
 
 //***AP***
 // static data to keep track of the old station bits state
@@ -158,6 +140,7 @@ void OpenSprinkler::reboot() {
 // OpenSprinkler init function
 void OpenSprinkler::begin() {
 
+  
   //===== Shift Register =====//
   /*
   // shift register setup
@@ -193,17 +176,6 @@ void OpenSprinkler::begin() {
    digitalWrite(PIN_SR_OE, LOW);
    */
 
-  // set PWM frequency for LCD
-  TCCR1B = 0x01;
-  // turn on LCD backlight and contrast
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  pinMode(PIN_LCD_CONTRAST, OUTPUT);
-  analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
-  analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value); 
-
-  // begin lcd
-  lcd.begin(16, 2);
-
   // Rain sensor port set up
   pinMode(PIN_RAINSENSOR, INPUT);
   digitalWrite(PIN_RAINSENSOR, HIGH); // enabled internal pullup
@@ -225,44 +197,15 @@ void OpenSprinkler::begin() {
   nstations = 8;
   raindelay_stop_time = 0;
 
-  // define lcd custom characters
-  byte lcd_custom_char[8] = {
-    B00000,
-    B10100,
-    B01000,
-    B10101,
-    B00001,
-    B00101,
-    B00101,
-    B10101
-  };
-  lcd.createChar(1, lcd_custom_char);  
-  lcd_custom_char[1]=0;
-  lcd_custom_char[2]=0;
-  lcd_custom_char[3]=1;    
-  lcd.createChar(0, lcd_custom_char); 
-
   // set rf data pin
-  pinMode(PIN_RF_DATA, OUTPUT);
-  digitalWrite(PIN_RF_DATA, LOW);
-
-  // ===== Freetronics LCD Shield =====
-
-  // set button pins
-   // enable internal pullup
-   pinMode(PIN_BUTTON_1, INPUT);
-   pinMode(PIN_BUTTON_2, INPUT);
-   pinMode(PIN_BUTTON_3, INPUT);    
-   digitalWrite(PIN_BUTTON_1, HIGH);
-   digitalWrite(PIN_BUTTON_2, HIGH);
-   digitalWrite(PIN_BUTTON_3, HIGH); 
-
-  // ===== Freetronics LCD Shield =====
+//  pinMode(PIN_RF_DATA, OUTPUT);
+//  digitalWrite(PIN_RF_DATA, LOW);
 
   // detect if DS1307 RTC exists
   if (RTC.chipPresent()==0) {
     status.has_rtc = 1;
   }
+  
 //    status.has_rtc = 0;
 }
 
@@ -271,9 +214,9 @@ void OpenSprinkler::self_test(unsigned long ms) {
   byte sid;
   while(1) {
     for(sid=0; sid<nstations; sid++) {
-      lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print((int)sid+1);
+//      lcd.clear();
+//      lcd.setCursor(0, 0);
+//      lcd.print((int)sid+1);
       clear_all_station_bits();
       set_station_bit(sid, 1);
       apply_all_station_bits();
@@ -432,8 +375,8 @@ void OpenSprinkler::options_setup() {
     eeprom_string_set(ADDR_EEPROM_PASSWORD, DEFAULT_PASSWORD);  // write default password
     eeprom_string_set(ADDR_EEPROM_LOCATION, DEFAULT_LOCATION);  // write default location
 
-    lcd_print_line_clear_pgm(PSTR("Resetting EEPROM"), 0);
-    lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);  
+    localUI.lcd_print_line_clear_pgm(PSTR("Resetting EEPROM"), 0);
+    localUI.lcd_print_line_clear_pgm(PSTR("Please Wait..."), 1);  
 
     int i, sn;
     for(i=ADDR_EEPROM_STN_NAMES; i<INT_EEPROM_SIZE; i++) {
@@ -463,58 +406,6 @@ void OpenSprinkler::options_setup() {
     masop_load();   // load master operation bits
   }
 
-  byte button = button_read(BUTTON_WAIT_NONE);
-
-  switch(button & BUTTON_MASK) {
-  case BUTTON_1:
-    // if BUTTON_1 is pressed during startup, go to self-test
-    delay(100);
-
-    // ===== Added for Freetronics LCD Shield =====
-    /*
-    if(digitalRead(PIN_BUTTON_3) == 0) {
-     // if BUTTON_3 is pressed at the same time
-     // enter short test
-     self_test(800);
-     } else {
-     	  self_test((unsigned long)options[OPTION_SELFTEST_TIME].value*1000);
-     }
-     */
-    // ===== Added for Freetronics LCD Shield =====
-
-    self_test((unsigned long)options[OPTION_SELFTEST_TIME].value*1000);
-    break;
-
-  case BUTTON_2:
-    // if BUTTON_2 is pressed during startup, go to 'reset all options'
-    ui_set_options(OPTION_RESET);
-    if (options[OPTION_RESET].value) {
-      resetFunc();
-    }
-    break;
-
-  case BUTTON_3:
-    // if BUTTON_3 is pressed during startup, enter Setup option mode
-    lcd_print_line_clear_pgm(PSTR("==Set Options=="), 0);
-    delay(DISPLAY_MSG_MS);
-    lcd_print_line_clear_pgm(PSTR("B3:sel B1/B2:chg"), 0);
-    lcd_print_line_clear_pgm(PSTR("B3:hold to save"), 1);
-    do {
-      button = button_read(BUTTON_WAIT_NONE);
-    } 
-    while (!(button & BUTTON_FLAG_DOWN));
-    lcd.clear();
-    ui_set_options(0);
-    if (options[OPTION_RESET].value) {
-      resetFunc(); 
-    }
-    break;
-  }
-  // turn on LCD backlight and contrast
-  pinMode(PIN_LCD_BACKLIGHT, OUTPUT);
-  pinMode(PIN_LCD_CONTRAST, OUTPUT);
-  analogWrite(PIN_LCD_CONTRAST, options[OPTION_LCD_CONTRAST].value);
-  analogWrite(PIN_LCD_BACKLIGHT, 255-options[OPTION_LCD_BACKLIGHT].value); 
 }
 
 // Load options from internal eeprom
@@ -573,405 +464,6 @@ void OpenSprinkler::rainsensor_status() {
   status.rain_sensed = (digitalRead(PIN_RAINSENSOR) == options[OPTION_RAINSENSOR_TYPE].value ? 0 : 1);
 }
 
-// =============
-// LCD Functions
-// =============
-
-// Print a program memory string
-void OpenSprinkler::lcd_print_pgm(PGM_P PROGMEM str) {
-  uint8_t c;
-  while((c=pgm_read_byte(str++))!= '\0') {
-    lcd.print((char)c);
-  }
-}
-
-// Print a program memory string to a given line with clearing
-void OpenSprinkler::lcd_print_line_clear_pgm(PGM_P PROGMEM str, byte line) {
-  lcd.setCursor(0, line);
-  uint8_t c;
-  int8_t cnt = 0;
-  while((c=pgm_read_byte(str++))!= '\0') {
-    lcd.print((char)c);
-    cnt++;
-  }
-  for(; (16-cnt) >= 0; cnt ++) lcd_print_pgm(PSTR(" "));  
-}
-
-void OpenSprinkler::lcd_print_2digit(int v)
-{
-  lcd.print((int)(v/10));
-  lcd.print((int)(v%10));
-}
-
-// Print time to a given line
-void OpenSprinkler::lcd_print_time(byte line)
-{
-  time_t t=now();
-  lcd.setCursor(0, line);
-  lcd_print_2digit(hour(t));
-  
-  // ======== W5100 ========
-  lcd_print_pgm( t%2 > 0 ? PSTR(":") : PSTR(" ") );
-  // ======== W5100 ========
-  
-  lcd_print_2digit(minute(t));
-  lcd_print_pgm(PSTR("  "));
-  lcd_print_pgm(days_str[weekday_today()]);
-  lcd_print_pgm(PSTR(" "));
-  lcd_print_2digit(month(t));
-  lcd_print_pgm(PSTR("-"));
-  lcd_print_2digit(day(t));
-}
-
-// Print free memory
-void OpenSprinkler::lcd_print_memory(byte line)
-{
-  lcd.setCursor(0, line);
-  lcd_print_pgm(PSTR("Free RAM:        "));
-  
-  lcd.setCursor(10, line);
-  lcd.print(freeMemory());
-  
-  lcd.setCursor(15, line);
-  lcd.write(status.network_fails>0?1:0); 
-}
-
-// print ip address and port
-void OpenSprinkler::lcd_print_ip(const byte *ip, int http_port) {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  for (byte i=0; i<3; i++) {
-    lcd.print((int)ip[i]); 
-    lcd_print_pgm(PSTR("."));
-  }   
-  lcd.print((int)ip[3]);
-  lcd.setCursor(0, 1);
-  lcd_print_pgm(PSTR(":"));
-  lcd.print(http_port);
-}
-
-// Print station bits
-void OpenSprinkler::lcd_print_station(byte line, char c) {
-  //lcd_print_line_clear_pgm(PSTR(""), line);
-  lcd.setCursor(0, line);
-  if (status.display_board == 0) {
-    lcd_print_pgm(PSTR("MC:"));  // Master controller is display as 'MC'
-  }
-  else {
-    lcd_print_pgm(PSTR("E"));
-    lcd.print((int)status.display_board);
-    lcd_print_pgm(PSTR(":"));   // extension boards are displayed as E1, E2...
-  }
-
-  if (!status.enabled) {
-    lcd_print_line_clear_pgm(PSTR("-Disabled!-"), 1);
-  }
-  else if (status.rain_delayed || (status.rain_sensed && options[OPTION_USE_RAINSENSOR].value)) {
-    lcd_print_line_clear_pgm(PSTR("-Rain Stop-"), 1);
-  }
-  else {
-    byte bitvalue = station_bits[status.display_board];
-    for (byte s=0; s<8; s++) {
-      if (status.display_board == 0 &&(s+1) == options[OPTION_MASTER_STATION].value) {
-        lcd.print((bitvalue&1) ? (char)c : 'M'); // print master station
-      } 
-      else {
-        lcd.print((bitvalue&1) ? (char)c : '_');
-      }
-      bitvalue >>= 1;
-    }
-  }
-  lcd_print_pgm(PSTR("    "));
-  lcd.setCursor(15, 1);
-  lcd.write(status.network_fails>0?1:0); 
-}
-
-// Print an option value
-void OpenSprinkler::lcd_print_option(int i) {
-  lcd_print_line_clear_pgm(options[i].str, 0);  
-  lcd_print_line_clear_pgm(PSTR(""), 1);
-  lcd.setCursor(0, 1);
-  if(options[i].flag&OPFLAG_SETUP_EDIT) lcd.blink();
-  else lcd.noBlink();
-  int tz;
-  switch(i) {
-  case OPTION_TIMEZONE: // if this is the time zone option, do some conversion
-    tz = (int)options[i].value-48;
-    if (tz>=0) lcd_print_pgm(PSTR("+"));
-    else {
-      lcd_print_pgm(PSTR("-")); 
-      tz=-tz;
-    }
-    lcd.print(tz/4); // print integer portion
-    lcd_print_pgm(PSTR(":"));
-    tz = (tz%4)*15;
-    if (tz==0)  lcd_print_pgm(PSTR("00"));
-    else {
-      lcd.print(tz);  // print fractional portion
-    }
-    lcd_print_pgm(PSTR(" GMT"));    
-    break;
-  case OPTION_MASTER_ON_ADJ:
-    lcd_print_pgm(PSTR("+"));
-    lcd.print((int)options[i].value);
-    break;
-  case OPTION_MASTER_OFF_ADJ:
-    if(options[i].value>=60)  lcd_print_pgm(PSTR("+"));
-    lcd.print((int)options[i].value-60);
-    break;
-  case OPTION_HTTPPORT_0:
-    lcd.print((int)(options[i+1].value<<8)+options[i].value);
-    break;
-  case OPTION_LCD_CONTRAST:
-    analogWrite(PIN_LCD_CONTRAST, options[i].value);
-    lcd.print((int)options[i].value);
-    break;
-  case OPTION_LCD_BACKLIGHT:
-    analogWrite(PIN_LCD_BACKLIGHT, 255-options[i].value);
-    lcd.print((int)options[i].value);
-    break;
-  default:
-    // if this is a boolean option
-    if (options[i].max==1)
-      lcd_print_pgm(options[i].value ? PSTR("Yes") : PSTR("No"));
-    else
-      lcd.print((int)options[i].value);
-    break;
-  }
-  if (i==OPTION_WATER_LEVEL)  lcd_print_pgm(PSTR("%"));
-  else if (i==OPTION_MASTER_ON_ADJ || i==OPTION_MASTER_OFF_ADJ ||
-    i==OPTION_SELFTEST_TIME || i==OPTION_STATION_DELAY_TIME)
-    lcd_print_pgm(PSTR(" sec"));
-}
-
-
-// ================
-// Button Functions
-// ================
-
-// ===== Freetronics LCD Shield =====
-
-// Wait for button
- byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
- 
- int hold_time = 0;
- 
- //***AP***
- // My buttons 1-3 are INVERTED
- 
- if (waitmode==BUTTON_WAIT_NONE || (waitmode == BUTTON_WAIT_HOLD && is_holding)) {
-// if (digitalRead(pin_butt) != 0) return BUTTON_NONE;
- if (digitalRead(pin_butt) == 0) return BUTTON_NONE;
- return butt | (is_holding ? BUTTON_FLAG_HOLD : 0);
- }
- 
-// while (digitalRead(pin_butt) == 0 &&
- while (digitalRead(pin_butt) != 0 &&
- (waitmode == BUTTON_WAIT_RELEASE || (waitmode == BUTTON_WAIT_HOLD && hold_time<BUTTON_HOLD_MS))) {
- delay(BUTTON_DELAY_MS);
- hold_time += BUTTON_DELAY_MS;      
- };
- if (is_holding || hold_time >= BUTTON_HOLD_MS)
- butt |= BUTTON_FLAG_HOLD;
- return butt;
- 
- }
- 
- // Read button and returns button value 'OR'ed with flag bits
- byte OpenSprinkler::button_read(byte waitmode)
- {
- static byte old = BUTTON_NONE;
- byte curr = BUTTON_NONE;
- byte is_holding = (old&BUTTON_FLAG_HOLD);
- 
- delay(BUTTON_DELAY_MS);
- 
- //***AP*** 
- // My buttons 1 to 3 are INVERTED
-// if (digitalRead(PIN_BUTTON_1) == 0) {
- 
- if (digitalRead(PIN_BUTTON_1) != 0) {
- curr = button_read_busy(PIN_BUTTON_1, waitmode, BUTTON_1, is_holding);
- } 
- else if (digitalRead(PIN_BUTTON_2) != 0) {
- curr = button_read_busy(PIN_BUTTON_2, waitmode, BUTTON_2, is_holding);
- } 
- else if (digitalRead(PIN_BUTTON_3) != 0) {
- curr = button_read_busy(PIN_BUTTON_3, waitmode, BUTTON_3, is_holding);
- }
- 
- // set flags in return value 
- byte ret = curr;
- if (!(old&BUTTON_MASK) && (curr&BUTTON_MASK))
- ret |= BUTTON_FLAG_DOWN;
- if ((old&BUTTON_MASK) && !(curr&BUTTON_MASK))
- ret |= BUTTON_FLAG_UP;
- 
- old = curr;
- return ret;
- }
-
-
-/*
-// Wait for button
-byte OpenSprinkler::button_read_busy(byte pin_butt, byte waitmode, byte butt, byte is_holding) {
-
-  int hold_time = 0;
-
-  if (waitmode==BUTTON_WAIT_NONE || (waitmode == BUTTON_WAIT_HOLD && is_holding)) 
-  {
-    if (button_sample() == BUTTON_NONE) return BUTTON_NONE;
-    return butt | (is_holding ? BUTTON_FLAG_HOLD : 0);
-  }
-
-  while (button_sample() != BUTTON_NONE &&
-    (waitmode == BUTTON_WAIT_RELEASE || (waitmode == BUTTON_WAIT_HOLD && hold_time<BUTTON_HOLD_MS))) {
-    delay(BUTTON_DELAY_MS);
-    hold_time += BUTTON_DELAY_MS;      
-  };
-  if (is_holding || hold_time >= BUTTON_HOLD_MS)
-    butt |= BUTTON_FLAG_HOLD;
-  return butt;
-
-}
-*/
-
-/*
-// Read button and returns button value 'OR'ed with flag bits
-byte OpenSprinkler::button_read(byte waitmode)
-{
-  static byte old = BUTTON_NONE;
-  byte curr = BUTTON_NONE;
-  byte is_holding = (old&BUTTON_FLAG_HOLD);
-
-  delay(BUTTON_DELAY_MS);
-
-  curr = button_sample();
-
-  // Button 1 = Increase  = Up and Right
-  // Button 2 = Decrease = Down and Left 
-  // Button 3 = Select = Select
-  switch (curr) {
-  case BUTTON_UP:
-  case BUTTON_RIGHT:
-    curr = button_read_busy(BUTTON_ADC_PIN, waitmode, BUTTON_1, is_holding);
-    ;
-    break;
-
-  case BUTTON_DOWN:
-  case BUTTON_LEFT:
-    curr = button_read_busy(BUTTON_ADC_PIN, waitmode, BUTTON_2, is_holding);
-    break;
-
-  case BUTTON_SELECT:
-    curr = button_read_busy(BUTTON_ADC_PIN, waitmode, BUTTON_3, is_holding);
-    break;
-
-  default:
-    curr = BUTTON_NONE;
-  }
-
-//   set flags in return value 
-  byte ret = curr;
-  if (!(old&BUTTON_MASK) && (curr&BUTTON_MASK))
-    ret |= BUTTON_FLAG_DOWN;
-  if ((old&BUTTON_MASK) && !(curr&BUTTON_MASK))
-    ret |= BUTTON_FLAG_UP;
-
-  old = curr;
-  return ret;
-}
-*/
-
-/*
-byte OpenSprinkler::button_sample()
-{
-  unsigned int buttonVoltage;
-
-  //read the button ADC pin voltage
-  buttonVoltage = analogRead( BUTTON_ADC_PIN );
-
-  //sense if the voltage falls within valid voltage windows
-  if( buttonVoltage < ( RIGHT_10BIT_ADC + BUTTONHYSTERESIS ) )
-  {
-    return BUTTON_RIGHT;
-  }
-  else if(   buttonVoltage >= ( UP_10BIT_ADC - BUTTONHYSTERESIS )
-    && buttonVoltage <= ( UP_10BIT_ADC + BUTTONHYSTERESIS ) )
-  {
-    return BUTTON_UP;
-  }
-  else if(   buttonVoltage >= ( DOWN_10BIT_ADC - BUTTONHYSTERESIS )
-    && buttonVoltage <= ( DOWN_10BIT_ADC + BUTTONHYSTERESIS ) )
-  {
-    return BUTTON_DOWN;
-  }
-  else if(   buttonVoltage >= ( LEFT_10BIT_ADC - BUTTONHYSTERESIS )
-    && buttonVoltage <= ( LEFT_10BIT_ADC + BUTTONHYSTERESIS ) )
-  {
-    return BUTTON_LEFT;
-  }
-  else if(   buttonVoltage >= ( SELECT_10BIT_ADC - BUTTONHYSTERESIS )
-    && buttonVoltage <= ( SELECT_10BIT_ADC + BUTTONHYSTERESIS ) )
-  {
-    return BUTTON_SELECT;
-  }
-  else 
-    return BUTTON_NONE;
-}
-// ===== Added for Freetronics LCD Shield =====
-*/
-
-// user interface for setting options during startup
-void OpenSprinkler::ui_set_options(int oid)
-{
-  boolean finished = false;
-  byte button;
-  int i=oid;
-
-  lcd_print_option(i);
-  while(!finished) {
-    button = button_read(BUTTON_WAIT_HOLD);
-
-    switch (button & BUTTON_MASK) {
-    case BUTTON_1:
-      if (!(options[i].flag&OPFLAG_SETUP_EDIT)) break; // ignore non-editable options
-      if (options[i].max != options[i].value) options[i].value ++;
-      break;
-
-    case BUTTON_2:
-      if (!(options[i].flag&OPFLAG_SETUP_EDIT)) break; // ignore non-editable options
-      if (options[i].value != 0) options[i].value --;
-      break;
-
-    case BUTTON_3:
-      if (!(button & BUTTON_FLAG_DOWN)) break; 
-      if (button & BUTTON_FLAG_HOLD) {
-        // if OPTION_RESET is set to nonzero, change it to reset condition value
-        if (options[OPTION_RESET].value) {
-          options[OPTION_RESET].value = 0xAA;
-        }
-        // long press, save options
-        options_save();
-        finished = true;
-      } 
-      else {
-        // click, move to the next option
-        if (i==OPTION_USE_DHCP && options[i].value) i += 9; // if use DHCP, skip static ip set
-        else if(i==OPTION_HTTPPORT_0) i+=2; // skip OPTION_HTTPPORT_1
-        else if(i==OPTION_USE_RAINSENSOR && options[i].value==0) i+=2; // if not using rain sensor, skip rain sensor type
-        else if(i==OPTION_MASTER_STATION && options[i].value==0) i+=3; // if not using master station, skip master on/off adjust
-        else  i = (i+1) % NUM_OPTIONS;
-      }
-      break;
-    }
-
-    if (button != BUTTON_NONE) {
-      lcd_print_option(i);
-    }
-  }
-  lcd.noBlink();
-}
 
 // ==================
 // String Functions
