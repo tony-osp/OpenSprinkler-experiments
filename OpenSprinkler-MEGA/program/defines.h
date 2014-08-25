@@ -171,8 +171,8 @@ OS_OPTION_t;
 
 
  #define PIN_BUTTON_1      A0    // button 1
- #define PIN_BUTTON_2      A1    // button 2
- #define PIN_BUTTON_3      A2    // button 3 
+ #define PIN_BUTTON_2      A2    // button 2
+ #define PIN_BUTTON_3      A1    // button 3 
  #define PIN_BUTTON_4      A3    // button 4 
 
 // switch which input method to use - 1==Analog, undefined - Digital buttons
