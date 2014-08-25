@@ -1,0 +1,19 @@
+#!/bin/bash
+# Used to transfer things in the web directory to the running Arduino via tftp
+# Simply type ./xfer from the source directory.
+# Assumes the host is at the default 192.168.10.20
+
+HOST="192.168.10.20"
+filez=""
+for file in web/*.{htm,ico,gif}; do 
+	filez="$filez $file"
+done 
+echo $filez
+
+tftp $HOST << EOF
+mode binary
+verbose
+put $filez /web
+quit
+EOF
+

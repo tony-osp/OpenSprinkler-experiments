@@ -1,0 +1,226 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="_core">
+      <UniqueIdentifier>{a5e77ef4-0f92-4e19-ba7b-349233020d76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_libraries">
+      <UniqueIdentifier>{deaac99b-b3d8-4b18-808e-6a047ba7ca37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_libraries\SD">
+      <UniqueIdentifier>{93ece549-1008-423b-b894-7cbac32d806f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_libraries\Ethernet">
+      <UniqueIdentifier>{fcbd5a6a-58a8-43a7-a5ae-1bce83c33aee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_libraries\SPI">
+      <UniqueIdentifier>{93ed481c-b631-4dc0-8c5b-78d5fa54a903}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_libraries\EEPROM">
+      <UniqueIdentifier>{8c3d495f-19af-41e9-a25a-0ca04c38a135}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_libraries\Time">
+      <UniqueIdentifier>{6acc910d-303e-4fad-aece-324b7720075a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_libraries\SDFatLib32">
+      <UniqueIdentifier>{0dedacfd-f11c-47b5-bf00-763bd44547fe}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="sprinklers.ino" />
+    <None Include="Makefile" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="freeMemory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Visual Micro\.sprinklers.vsarduino.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sysreset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tftp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Weather.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="nntp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="web.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Event.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="settings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="port.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Visual Micro\.sprinklers_avr-1.0.0.vsarduino.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Arduino.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\binary.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Client.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\HardwareSerial.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\IPAddress.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\new.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Platform.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Print.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Printable.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Server.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Stream.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\Udp.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\USBAPI.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\USBCore.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\USBDesc.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\WCharacter.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\wiring_private.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\cores\standard\WString.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\hardware\mighty-1284p\variants\bobuino\pins_arduino.h">
+      <Filter>_core</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="freeMemory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sysreset.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tftp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Weather.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="nntp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="web.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="core.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Event.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="settings.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="port.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\CDC.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\HardwareSerial.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\HID.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\IPAddress.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\main.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\new.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\Print.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\Stream.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\Tone.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\USBCore.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\WInterrupts.c">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\wiring.c">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\wiring_analog.c">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\wiring_digital.c">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\wiring_pulse.c">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\wiring_shift.c">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\WMath.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\hardware\mighty-1284p\cores\standard\WString.cpp">
+      <Filter>_core</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
