@@ -33,18 +33,7 @@ limitations under the License.
 #include <ethernet.h>
 #include "nntp.h"
 #include "core.h"
-
-// external references
-
-IPAddress GetIP();
-IPAddress GetGateway();
-uint16_t GetWebPort();
-
-extern nntp nntpTimeServer;
-extern runStateClass runState;
-
-bool GetRunSchedules(void);
-void SetRunSchedules(bool value);
+#include "settings.h"
 
 // Data members
 byte OSLocalUI::osUI_State = OSUI_STATE_UNDEFINED;
@@ -377,15 +366,14 @@ byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
                 lcd_print_pgm(PSTR("Starting Manual"));
 
                 lcd.setCursor(0, 1);
-                lcd_print_pgm(PSTR("Ch: "));    lcd_print_2digit(sel_manual_ch);
+                lcd_print_pgm(PSTR("Ch: "));    lcd_print_2digit(sel_manual_ch+1);    //note: actual useful zones are numbered from 1, adjust it for display
                 lcd_print_pgm(PSTR(" Min: "));  lcd_print_2digit(num_min);
 
                 delay(2000);
 
                 if( num_min != 0 ){
 
-                    manual_station_on((byte)(sel_manual_ch+1), num_min);        // start required station in manual mode for num_min only if required time is != 0
-                                                                                                                     // note channel numbering for execution system - it starts from 1!
+                      manual_station_on((byte)(sel_manual_ch), num_min);        // start required station in manual mode for num_min only if required time is != 0
                 }
                 set_mode( OSUI_MODE_HOME ); // Manual watering started, exit current UI mode changing it to HOME
                 return true;
@@ -393,12 +381,12 @@ byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
 // now screen update and blinking cursor
      if( (last_time != curr_time) || (forceRefresh !=0) ) {  // update UI once a second (for blinking), OR if explicit refresh is required
 
-       last_time = curr_time;
+           last_time = curr_time;
 
            lcd.setCursor(0, 1);
-       lcd_print_2digit(num_min);
-       if( curr_time%2 ) lcd_print_pgm(PSTR("   "));
-       else                      lcd_print_pgm(PSTR("#  "));
+           lcd_print_2digit(num_min);
+           if( curr_time%2 ) lcd_print_pgm(PSTR("   "));
+           else                      lcd_print_pgm(PSTR("#  "));
      }
 
   }
@@ -449,7 +437,7 @@ byte OSLocalUI::modeHandler_Viewconf(byte forceRefresh)
 
              lcd_print_pgm(PSTR("Conf: Version"));
              lcd.setCursor(0,1);
-             lcd_print_pgm(PSTR("V 2.00 (AP)"));
+             lcd_print_pgm(PSTR(VERSION));
           }
           else if( osUI_Page == 1 ){
              uint32_t ip = GetIP();
@@ -517,7 +505,7 @@ void OSLocalUI::lcd_print_station(byte line, char c) {
   }
   lcd_print_pgm(PSTR("    "));
   lcd.setCursor(15, 1);
-  lcd.write(nntpTimeServer.GetNetworkStatus()?1:0);
+  lcd.write(nntpTimeServer.GetNetworkStatus()?0:1);
 }
 
  // Print stations string using provided default char, and highlight specific station using provided alt char
@@ -537,7 +525,7 @@ void OSLocalUI::lcd_print_station(byte line, char def_c, byte sel_stn, char sel_
   }
   lcd_print_pgm(PSTR("    "));
   lcd.setCursor(15, 1);
-  lcd.write(nntpTimeServer.GetNetworkStatus()?1:0);
+  lcd.write(nntpTimeServer.GetNetworkStatus()?0:1);
 }
 
 
@@ -602,7 +590,7 @@ void OSLocalUI::lcd_print_memory(byte line)
   lcd.print(freeRam());
 
   lcd.setCursor(15, line);
-  lcd.write(nntpTimeServer.GetNetworkStatus()?1:0);
+  lcd.write(nntpTimeServer.GetNetworkStatus()?0:1);
 }
 
 // print ip address
@@ -624,6 +612,8 @@ byte weekday_today() {
 // Local wrapper for manual valve control.
 // sid is the station number (from 1!), ontimer is the number of minutes to run
 //
+/*
+// this version uses Manual control (just On/Off, no time control)
 void manual_station_on(byte sid, int ontimer)
 {
         if( GetRunSchedules() )  SetRunSchedules(false);  // schedules currently enabled, disable it
@@ -640,4 +630,33 @@ void manual_station_on(byte sid, int ontimer)
         TurnOnZone(sid);
         runState.SetManual(true, sid);
 }
+*/
+
+// this version uses QuickSchedule mechanism, allows setting run time as well as multi-valve runs
+void manual_station_on(byte sid, int ontimer)
+{
+        if( sid >= NUM_ZONES ) return;    // basic protection, ensure that required zone number is within acceptable range
+  
+	// So, we first end any schedule that's currently running by turning things off then on again.
+	ReloadEvents();
+
+        if( ActiveZoneNum() != -1 ){    // something is currently running, turn it off
+
+                TurnOffZones();
+                runState.SetManual(false);
+        }
+
+        for( byte n=0; n<NUM_ZONES; n++ ){  
+          
+                quickSchedule.zone_duration[n] = 0;  // clear up QuickSchedule to zero out run time for all zones
+        }
+
+// set run time for required zone.
+//
+	quickSchedule.zone_duration[sid] = ontimer;
+
+        LoadSchedTimeEvents(0, true);
+}
+
+
 

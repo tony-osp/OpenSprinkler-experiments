@@ -76,7 +76,7 @@ void runStateClass::SetManual(bool val, int8_t zone)
 }
 
 #ifdef ARDUINO
-uint8_t ZoneToIOMap[] = {40, 41, 42, 43, 44, 45, 46, 47, 38, 37, 36, 35, 34, 33, 32, 31};
+uint8_t ZoneToIOMap[] = {31, 41, 40, 42, 43, 44, 45, 46, 47, 38, 37, 36, 35, 34, 33, 32};
 #define SR_CLK_PIN  30
 #define SR_NOE_PIN  29
 #define SR_DAT_PIN  28

@@ -90,9 +90,9 @@ static unsigned long getNtpTime()
 			// print Unix time:
 			Serial.println(epoch);  
 			Udp.stop();
-			return epoch;
-                        
                         fNntpSync = true;
+
+			return epoch;                        
 		}
 		if (!(timeout--) > 0)
 		{
