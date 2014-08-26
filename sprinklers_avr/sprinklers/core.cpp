@@ -77,6 +77,10 @@ void runStateClass::SetManual(bool val, int8_t zone)
 
 #ifdef ARDUINO
 uint8_t ZoneToIOMap[] = {40, 41, 42, 43, 44, 45, 46, 47, 38, 37, 36, 35, 34, 33, 32, 31};
+#define SR_CLK_PIN  30
+#define SR_NOE_PIN  29
+#define SR_DAT_PIN  28
+#define SR_LAT_PIN  27
 #else
 uint8_t ZoneToIOMap[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 #define SR_CLK_PIN  7
@@ -153,10 +157,24 @@ void io_setup()
                         trace("Failed to Setup Outputs\n");
                 }
 #endif
-                for (uint8_t i=0; i<sizeof(ZoneToIOMap); i++)
+                if (eot == OT_OPEN_SPRINKLER)
                 {
-                        pinMode(ZoneToIOMap[i], OUTPUT);
-                        digitalWrite(ZoneToIOMap[i], (eot==OT_DIRECT_NEG)?1:0);
+                        pinMode(SR_CLK_PIN, OUTPUT);
+                        digitalWrite(SR_CLK_PIN, 0);
+                        pinMode(SR_NOE_PIN, OUTPUT);
+                        digitalWrite(SR_NOE_PIN, 0);
+                        pinMode(SR_DAT_PIN, OUTPUT);
+                        digitalWrite(SR_DAT_PIN, 0);
+                        pinMode(SR_LAT_PIN, OUTPUT);
+                        digitalWrite(SR_LAT_PIN, 0);
+                }
+                else
+                {
+                        for (uint8_t i=0; i<sizeof(ZoneToIOMap); i++)
+                        {
+                                pinMode(ZoneToIOMap[i], OUTPUT);
+                                digitalWrite(ZoneToIOMap[i], (eot==OT_DIRECT_NEG)?1:0);
+                        }
                 }
         }
         outState = 0;
@@ -181,12 +199,12 @@ bool isZoneOn(int iNum)
 int ActiveZoneNum(void)
 {
         if( outState == 0 ) return -1;      // nothing is running
- 
+
         for( byte n=1; n<=NUM_ZONES; n++){          // note: zones are numbered from 1. Slot 0 is used for the common pump.
-         
+
              if(  outState & (0x01 << n) ) return n;   // we found active zone, return its index
         }
-        
+
         return -1;  // strange, we really should not get there - it could happen only when pump is On, but all zones are off. Treat this condition as Off.
 }
 
@@ -206,7 +224,7 @@ void TurnOnZone(int iValve)
 
         ShortZone zone;
         LoadShortZone(iValve - 1, &zone);
-        outState = 0x01 << iValve ;           
+        outState = 0x01 << iValve;
         // Turn on the pump if necessary
         pumpControl(zone.bPump);
 }
