@@ -474,13 +474,7 @@ byte OSLocalUI::modeHandler_Setup(byte forceRefresh)
 
 
 
-//
-// Code copied from OpenSprinklerGen2.cpp
-
-// =============
-// LCD Functions
-// =============
-
+// various LCD output functions
 
  // Print station bits
 void OSLocalUI::lcd_print_station(byte line, char c) {
@@ -612,33 +606,14 @@ byte weekday_today() {
 // Local wrapper for manual valve control.
 // sid is the station number (from 1!), ontimer is the number of minutes to run
 //
-/*
-// this version uses Manual control (just On/Off, no time control)
-void manual_station_on(byte sid, int ontimer)
-{
-        if( GetRunSchedules() )  SetRunSchedules(false);  // schedules currently enabled, disable it
-
-        if( ActiveZoneNum() != -1 ){    // something is currently running, turn it off
-
-                TurnOffZones();
-                runState.SetManual(false);
-        }
-
-// manually start required zone.
-// Note: currently we ignore the number of minutes to run. This is strictly temporary.
-//
-        TurnOnZone(sid);
-        runState.SetManual(true, sid);
-}
-*/
 
 // this version uses QuickSchedule mechanism, allows setting run time as well as multi-valve runs
 void manual_station_on(byte sid, int ontimer)
 {
         if( sid >= NUM_ZONES ) return;    // basic protection, ensure that required zone number is within acceptable range
-  
-	// So, we first end any schedule that's currently running by turning things off then on again.
-	ReloadEvents();
+
+        // So, we first end any schedule that's currently running by turning things off then on again.
+        ReloadEvents();
 
         if( ActiveZoneNum() != -1 ){    // something is currently running, turn it off
 
@@ -646,14 +621,14 @@ void manual_station_on(byte sid, int ontimer)
                 runState.SetManual(false);
         }
 
-        for( byte n=0; n<NUM_ZONES; n++ ){  
-          
+        for( byte n=0; n<NUM_ZONES; n++ ){
+
                 quickSchedule.zone_duration[n] = 0;  // clear up QuickSchedule to zero out run time for all zones
         }
 
 // set run time for required zone.
 //
-	quickSchedule.zone_duration[sid] = ontimer;
+        quickSchedule.zone_duration[sid] = ontimer;
 
         LoadSchedTimeEvents(0, true);
 }
