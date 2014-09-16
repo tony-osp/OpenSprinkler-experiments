@@ -33,6 +33,7 @@
 #include <SDFat.h>
 #include <LiquidCrystal.h>
 #include "LocalUI.h"
+#include "sd-log.h"
 
 OSLocalUI localUI;
 

@@ -20,7 +20,7 @@ static tftp tftpServer;
 #endif
 
 #ifdef LOGGING
-Logging log;
+Logging sdlog;
 #endif
 static web webServer;
 nntp nntpTimeServer;
@@ -37,7 +37,7 @@ void runStateClass::LogSchedule()
 {
 #ifdef LOGGING
         if ((m_eventTime > 0) && (m_zone >= 0))
-                log.LogZoneEvent(m_eventTime, m_zone, nntpTimeServer.LocalNow() - m_eventTime, m_bSchedule ? m_iSchedule+1:-1, m_adj.seasonal, m_adj.wunderground);
+                sdlog.LogZoneEvent(m_eventTime, m_zone, nntpTimeServer.LocalNow() - m_eventTime, m_bSchedule ? m_iSchedule+1:-1, m_adj.seasonal, m_adj.wunderground);
 #endif
 }
 
@@ -416,11 +416,6 @@ void mainLoop()
                         ResetEEPROM();
                 io_setup();
 
-#ifdef LOGGING
-                if (!log.Init())
-                        exit(EXIT_FAILURE);
-#endif
-
                 TurnOffZones();
                 ClearEvents();
 
@@ -438,6 +433,10 @@ void mainLoop()
 
                 ReloadEvents();
                 //ShowSockStatus();
+#ifdef LOGGING
+                sdlog.begin(PSTR("System started."));
+#endif
+
         }
 
         // Check to see if we need to set the clock and do so if necessary.

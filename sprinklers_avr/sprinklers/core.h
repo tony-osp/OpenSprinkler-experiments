@@ -4,6 +4,9 @@
 // Copyright (c) 2013 Richard Zimmerman
 //
 
+// enable logging support
+#define LOGGING 1
+
 #ifndef _CORE_h
 #define _CORE_h
 
@@ -13,8 +16,8 @@
 #include <inttypes.h>
 #include "port.h"
 #ifdef LOGGING
-#include "Logging.h"
-extern Logging log;
+#include "sd-log.h"
+extern Logging sdlog;
 #endif
 
 #ifndef VERSION

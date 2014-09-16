@@ -17,6 +17,10 @@
 #include <stdio.h>
 #include "Event.h"
 
+// local forward declaration 
+static void ServeFile(FILE * stream_file, const char * fname, SdFile & theFile, EthernetClient & client);
+
+
 web::web(void)
 		: m_server(0)
 {
@@ -78,9 +82,10 @@ static int stream_putchar(char c, FILE *stream)
 }
 #endif
 
-static void ServeHeader(FILE * stream_file, int code, const char * pReason, bool cache, const char * type = "text/html")
+
+static void ServeHeader(FILE * stream_file, int code, const char * pReason, bool cache, char * type)
 {
-	fprintf_P(stream_file, PSTR("HTTP/1.1 %d %s\nContent-Type: %s\n"), code, pReason, type);
+	fprintf_P(stream_file, PSTR("HTTP/1.1 %d %S\nContent-Type: %S\n"), code, pReason, type);
 	if (cache)
 		fprintf_P(stream_file, PSTR("Last-Modified: Fri, 02 Jun 2006 09:46:32 GMT\nExpires: Sun, 17 Jan 2038 19:14:07 GMT\n"));
 	else
@@ -88,23 +93,31 @@ static void ServeHeader(FILE * stream_file, int code, const char * pReason, bool
 	fputc('\n', stream_file);
 }
 
+static void ServeHeader(FILE * stream_file, int code, const char * pReason, bool cache)
+{
+     ServeHeader(stream_file, code, pReason, cache, PSTR("text/html"));
+}
+
+
+
+
 static void Serve404(FILE * stream_file)
 {
-	ServeHeader(stream_file, 404, "NOT FOUND", false);
-	fprintf(stream_file, "NOT FOUND");
+	ServeHeader(stream_file, 404, PSTR("NOT FOUND"), false);
+	fprintf_P(stream_file, PSTR("NOT FOUND"));
 }
 
 static void ServeError(FILE * stream_file)
 {
-	ServeHeader(stream_file, 405, "NOT ALLOWED", false);
-	fprintf(stream_file, "NOT ALLOWED");
+	ServeHeader(stream_file, 405, PSTR("NOT ALLOWED"), false);
+	fprintf_P(stream_file, PSTR("NOT ALLOWED"));
 }
 
 static void JSONSchedules(const KVPairs & key_value_pairs, FILE * stream_file)
 {
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 	int iNumSchedules = GetNumSchedules();
-	fprintf(stream_file, "{\n\"Table\" : [\n");
+	fprintf_P(stream_file, PSTR("{\n\"Table\" : [\n"));
 	Schedule sched;
 	for (int i = 0; i < iNumSchedules; i++)
 	{
@@ -112,12 +125,12 @@ static void JSONSchedules(const KVPairs & key_value_pairs, FILE * stream_file)
 		fprintf_P(stream_file, PSTR("%s\t{\"id\" : %d, \"name\" : \"%s\", \"e\" : \"%s\" }"), (i == 0) ? "" : ",\n", i, sched.name,
 				(sched.IsEnabled()) ? "on" : "off");
 	}
-	fprintf(stream_file, "\n]}");
+	fprintf_P(stream_file, PSTR("\n]}"));
 }
 
 static void JSONZones(const KVPairs & key_value_pairs, FILE * stream_file)
 {
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 	fprintf_P(stream_file, PSTR("{\n\"zones\" : [\n"));
 	FullZone zone = {0};
 	for (int i = 0; i < NUM_ZONES; i++)
@@ -126,14 +139,136 @@ static void JSONZones(const KVPairs & key_value_pairs, FILE * stream_file)
 		fprintf_P(stream_file, PSTR("%s\t{\"name\" : \"%s\", \"enabled\" : \"%s\", \"pump\" : \"%s\", \"state\" : \"%s\" }"), (i == 0) ? "" : ",\n", zone.name,
 				zone.bEnabled ? "on" : "off", zone.bPump ? "on" : "off", isZoneOn(i + 1) ? "on" : "off");
 	}
-	fprintf(stream_file, "\n]}");
+	fprintf_P(stream_file, PSTR("\n]}"));
 }
 
 #ifdef LOGGING
+static void ShowLogs(char *sPage, FILE * pFile, EthernetClient client)
+{
+//   let's check what is it - log listing or a specific log file request
+
+   if( sPage[4] == 0 || sPage[4] == ' ' || (sPage[4] == '/' && sPage[5] == ' ')){    // this is log listing - the string is either /logs or /logs/ with a spacebar after the last character
+
+// this is log listing request
+        SdFile logfile;
+
+	trace(F("Serving logs directory listing\n"));
+  
+        if( !logfile.open("/logs", O_READ) ){
+
+            trace(F("Cannot open logs directory\n"));
+            Serve404(pFile);
+            return;    // failed to open logs directory
+        }
+
+        ServeHeader(pFile, 200, PSTR("OK"), false);  // note: no caching on logs directory rendering
+        
+        fprintf_P( pFile, PSTR("<html>\n<body>\n<h1>Directory listing of /logs</h1>\n<table> <tr> <td><b>File Name</b></td> <td>&nbsp&nbsp</td> <td><b>Size, bytes</b></td> </tr>\n"));
+
+       while(true) {
+
+            char fname[20] = {0};
+            SdFile entry;
+            if (!entry.openNext(&logfile, O_READ) ){
+       // no more files
+                  logfile.close();
+
+                  fprintf_P( pFile, PSTR("</table> </body>\n</html>"));
+                  return;          // all done, exiting
+            }
+
+            entry.getFilename(fname);
+            fprintf_P( pFile, PSTR("<tr> <td> <a href=\"/logs/%s\">%s</a> </td> <td>&nbsp&nbsp</td> <td>%u </td> </tr>"), fname, fname, entry.fileSize() ); 
+            entry.close();
+       }
+       logfile.close();
+
+   }
+   else {         // this is a request to an individual log file
+
+	trace(F("Serving log file: %s\n"), sPage);
+
+	SdFile theFile;
+	if (!theFile.open(sPage, O_READ))
+		Serve404(pFile);
+	else
+	{
+		if (theFile.isFile())
+  		        ServeFile(pFile, sPage, theFile, client);
+		else  
+			Serve404(pFile);
+
+		theFile.close();
+	}
+   }
+}
+
+static void ShowWateringLogs(char *sPage, FILE * pFile, EthernetClient client)
+{
+//   let's check what is it - log listing or a specific log file request
+
+   if( sPage[12] == 0 || sPage[12] == ' ' || (sPage[12] == '/' && sPage[13] == ' ')){    // this is log listing - the string is either /logs or /logs/ with a spacebar after the last character
+
+// this is log listing request
+        SdFile logfile;
+
+	trace(F("Serving watering logs directory listing\n"));
+  
+        if( !logfile.open("/watering.log", O_READ) ){
+
+            trace(F("Cannot open watering logs directory\n"));
+            Serve404(pFile);
+            return;    // failed to open logs directory
+        }
+
+        ServeHeader(pFile, 200, PSTR("OK"), false);  // note: no caching on logs directory rendering
+        
+        fprintf_P( pFile, PSTR("<html>\n<body>\n<h1>Directory listing of /watering.log</h1>\n<table> <tr> <td><b>File Name</b></td> <td>&nbsp&nbsp</td> <td><b>Size, bytes</b></td> </tr>\n"));
+
+       while(true) {
+
+            char fname[20] = {0};
+            SdFile entry;
+            if (!entry.openNext(&logfile, O_READ) ){
+       // no more files
+                  logfile.close();
+
+                  fprintf_P( pFile, PSTR("</table> </body>\n</html>"));
+                  return;          // all done, exiting
+            }
+
+            entry.getFilename(fname);
+            fprintf_P( pFile, PSTR("<tr> <td> <a href=\"/watering.log/%s\">%s</a> </td> <td>&nbsp&nbsp</td> <td>%u </td> </tr>"), fname, fname, entry.fileSize() ); 
+            entry.close();
+       }
+       logfile.close();
+
+   }
+   else {         // this is a request to an individual log file
+
+	trace(F("Serving watering log file: %s\n"), sPage);
+
+	SdFile theFile;
+	if (!theFile.open(sPage, O_READ))
+		Serve404(pFile);
+	else
+	{
+		if (theFile.isFile())
+  		        ServeFile(pFile, sPage, theFile, client);
+		else  
+			Serve404(pFile);
+
+		theFile.close();
+	}
+   }
+}
+
+
+#ifdef notdef
 static void JSONLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 {
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
-	fprintf(stream_file, "{\n");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
+	fprintf_P(stream_file, PSTR("{\n"));
 
 	time_t sdate = 0;
 	time_t edate = 0;
@@ -143,15 +278,15 @@ static void JSONLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 	{
 		const char * key = key_value_pairs.keys[i];
 		const char * value = key_value_pairs.values[i];
-		if (strcmp(key, "sdate") == 0)
+		if (strcmp_P(key, PSTR("sdate")) == 0)
 		{
 			sdate = strtol(value, 0, 10);
 		}
-		else if (strcmp(key, "edate") == 0)
+		else if (strcmp_P(key, PSTR("edate")) == 0)
 		{
 			edate = strtol(value, 0, 10);
 		}
-		else if (strcmp(key, "g") == 0)
+		else if (strcmp_P(key, PSTR("g")) == 0)
 		{
 			if (value[0] == 'h')
 				grouping = Logging::HOURLY;
@@ -163,13 +298,14 @@ static void JSONLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 	}
 
 	log.GraphZone(stream_file, sdate, edate, grouping);
-	fprintf(stream_file, "}");
+	fprintf_P(stream_file, PSTR("}"));
 }
+#endif //notdef
 
 static void JSONtLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 {
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
-	fprintf(stream_file, "{\n\t\"logs\": [\n");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
+	fprintf_P(stream_file, PSTR("{\n\t\"logs\": [\n"));
 	time_t sdate = 0;
 	time_t edate = 0;
 	// Iterate through the kv pairs and search for the start and end dates.
@@ -177,26 +313,26 @@ static void JSONtLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 	{
 		const char * key = key_value_pairs.keys[i];
 		const char * value = key_value_pairs.values[i];
-		if (strcmp(key, "sdate") == 0)
+		if (strcmp_P(key, PSTR("sdate")) == 0)
 		{
 			sdate = strtol(value, 0, 10);
 		}
-		else if (strcmp(key, "edate") == 0)
+		else if (strcmp_P(key, PSTR("edate")) == 0)
 		{
 			edate = strtol(value, 0, 10);
 		}
 	}
-	log.TableZone(stream_file, sdate, edate);
-	fprintf(stream_file, "\t]\n}");
+	sdlog.TableZone(stream_file, sdate, edate);
+	fprintf_P(stream_file, PSTR("\t]\n}"));
 }
 
-#endif
+#endif  //LOGGING
 
 static void JSONSettings(const KVPairs & key_value_pairs, FILE * stream_file)
 {
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 	IPAddress ip;
-	fprintf(stream_file, "{\n");
+	fprintf_P(stream_file, PSTR("{\n"));
 #ifdef ARDUINO
 	ip = GetIP();
 	fprintf_P(stream_file, PSTR("\t\"ip\" : \"%d.%d.%d.%d\",\n"), ip[0], ip[1], ip[2], ip[3]);
@@ -221,13 +357,13 @@ static void JSONSettings(const KVPairs & key_value_pairs, FILE * stream_file)
 	GetPWS(ak);
 	ak[11] = 0;
 	fprintf_P(stream_file, PSTR("\t\"pws\" : \"%s\"\n"), ak);
-	fprintf(stream_file, "}");
+	fprintf_P(stream_file, PSTR("}"));
 }
 
 static void JSONwCheck(const KVPairs & key_value_pairs, FILE * stream_file)
 {
 	Weather w;
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 	char key[17];
 	GetApiKey(key);
 	char pws[12] = {0};
@@ -235,7 +371,7 @@ static void JSONwCheck(const KVPairs & key_value_pairs, FILE * stream_file)
 	const Weather::ReturnVals vals = w.GetVals(GetWUIP(), key, GetZip(), pws, GetUsePWS());
 	const int scale = w.GetScale(vals);
 
-	fprintf(stream_file, "{\n");
+	fprintf_P(stream_file, PSTR("{\n"));
 	fprintf_P(stream_file, PSTR("\t\"valid\" : \"%s\",\n"), vals.valid ? "true" : "false");
 	fprintf_P(stream_file, PSTR("\t\"keynotfound\" : \"%s\",\n"), vals.keynotfound ? "true" : "false");
 	fprintf_P(stream_file, PSTR("\t\"minhumidity\" : \"%d\",\n"), vals.minhumidity);
@@ -246,12 +382,12 @@ static void JSONwCheck(const KVPairs & key_value_pairs, FILE * stream_file)
 	fprintf_P(stream_file, PSTR("\t\"wind_mph\" : \"%d\",\n"), vals.windmph);
 	fprintf_P(stream_file, PSTR("\t\"UV\" : \"%d\",\n"), vals.UV);
 	fprintf_P(stream_file, PSTR("\t\"scale\" : \"%d\"\n"), scale);
-	fprintf(stream_file, "}");
+	fprintf_P(stream_file, PSTR("}"));
 }
 
 static void JSONState(const KVPairs & key_value_pairs, FILE * stream_file)
 {
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 	fprintf_P(stream_file,
 			PSTR("{\n\t\"version\" : \"%s\",\n\t\"run\" : \"%s\",\n\t\"zones\" : \"%d\",\n\t\"schedules\" : \"%d\",\n\t\"timenow\" : \"%lu\",\n\t\"events\" : \"%d\""),
 			VERSION, GetRunSchedules() ? "on" : "off", GetNumEnabledZones(), GetNumSchedules(), nntpTimeServer.LocalNow(), iNumEvents);
@@ -277,7 +413,7 @@ static void JSONSchedule(const KVPairs & key_value_pairs, FILE * stream_file)
 	{
 		const char * key = key_value_pairs.keys[i];
 		const char * value = key_value_pairs.values[i];
-		if (strcmp(key, "id") == 0)
+		if (strcmp_P(key, PSTR("id")) == 0)
 		{
 			sched_num = atoi(value);
 		}
@@ -292,7 +428,7 @@ static void JSONSchedule(const KVPairs & key_value_pairs, FILE * stream_file)
 	}
 
 	// Now construct the response and send it
-	ServeHeader(stream_file, 200, "OK", false, "text/plain");
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 	Schedule sched;
 	LoadSchedule(sched_num, &sched);
 	fprintf_P(stream_file,
@@ -319,10 +455,10 @@ static void JSONSchedule(const KVPairs & key_value_pairs, FILE * stream_file)
 	{
 		FullZone zone;
 		LoadZone(i, &zone);
-		fprintf(stream_file, "%s\t\t{\"name\" : \"%s\", \"e\":\"%s\", \"duration\" : %d}", (i == 0) ? "" : ",\n", zone.name, zone.bEnabled ? "on" : "off",
+		fprintf_P(stream_file, PSTR("%s\t\t{\"name\" : \"%s\", \"e\":\"%s\", \"duration\" : %d}"), (i == 0) ? "" : ",\n", zone.name, zone.bEnabled ? "on" : "off",
 				sched.zone_duration[i]);
 	}
-	fprintf(stream_file, " ]\n}");
+	fprintf_P(stream_file, PSTR(" ]\n}"));
 }
 
 static bool SetQSched(const KVPairs & key_value_pairs)
@@ -342,7 +478,7 @@ static bool SetQSched(const KVPairs & key_value_pairs)
 		{
 			quickSchedule.zone_duration[key[1] - 'b'] = atoi(value);
 		}
-		if (strcmp(key, "sched") == 0)
+		if (strcmp_P(key, PSTR("sched")) == 0)
 		{
 			sched = atoi(value);
 		}
@@ -357,7 +493,7 @@ static bool SetQSched(const KVPairs & key_value_pairs)
 
 static void ServeEventPage(FILE * stream_file)
 {
-	ServeHeader(stream_file, 200, "OK", false);
+	ServeHeader(stream_file, 200, PSTR("OK"), false);
 	freeMemory();
 	const time_t timeNow = nntpTimeServer.LocalNow();
 	fprintf_P(stream_file, PSTR("<h1>%d Events</h1><h3>%02d:%02d:%02d %d/%d/%d (%d)</h3>"), iNumEvents, hour(timeNow), minute(timeNow), second(timeNow),
@@ -371,7 +507,7 @@ static void ServeSchedPage(FILE * stream_file)
 {
 	Schedule sched;
 	freeMemory();
-	ServeHeader(stream_file, 200, "OK", false);
+	ServeHeader(stream_file, 200, PSTR("OK"), false);
 	const uint8_t numSched = GetNumSchedules();
 	for (uint8_t iSchedNum = 0; iSchedNum < numSched; iSchedNum++)
 	{
@@ -388,19 +524,19 @@ static void ServeSchedPage(FILE * stream_file)
 		{
 			fprintf_P(stream_file, PSTR("Day :"));
 			if (sched.day & 0x01)
-				fprintf(stream_file, "Su");
+				fprintf_P(stream_file, PSTR("Su"));
 			if (sched.day & 0x02)
-				fprintf(stream_file, "M");
+				fprintf_P(stream_file, PSTR("M"));
 			if (sched.day & 0x04)
-				fprintf(stream_file, "T");
+				fprintf_P(stream_file, PSTR("T"));
 			if (sched.day & 0x08)
-				fprintf(stream_file, "W");
+				fprintf_P(stream_file, PSTR("W"));
 			if (sched.day & 0x10)
-				fprintf(stream_file, "R");
+				fprintf_P(stream_file, PSTR("R"));
 			if (sched.day & 0x20)
-				fprintf(stream_file, "F");
+				fprintf_P(stream_file, PSTR("F"));
 			if (sched.day & 0x40)
-				fprintf(stream_file, "Sa");
+				fprintf_P(stream_file, PSTR("Sa"));
 			fprintf_P(stream_file, PSTR("(%d)"), sched.day);
 		}
 		for (uint8_t i = 0; i < 4; i++)
@@ -413,7 +549,7 @@ static void ServeSchedPage(FILE * stream_file)
 static void ServeZonesPage(FILE * stream_file)
 {
 	FullZone zone;
-	ServeHeader(stream_file, 200, "OK", false);
+	ServeHeader(stream_file, 200, PSTR("OK"), false);
 	for (uint8_t iZoneNum = 0; iZoneNum < NUM_ZONES; iZoneNum++)
 	{
 		LoadZone(iZoneNum, &zone);
@@ -437,7 +573,7 @@ static bool RunSchedules(const KVPairs & key_value_pairs)
 	{
 		const char * key = key_value_pairs.keys[i];
 		const char * value = key_value_pairs.values[i];
-		if (strcmp(key, "system") == 0)
+		if (strcmp_P(key, PSTR("system")) == 0)
 		{
 			SetRunSchedules(strcmp(value, "on") == 0);
 		}
@@ -460,13 +596,13 @@ static bool ManualZone(const KVPairs & key_value_pairs)
 	{
 		const char * key = key_value_pairs.keys[i];
 		const char * value = key_value_pairs.values[i];
-		if ((strcmp(key, "zone") == 0) && (value[0] == 'z') && (value[1] > 'a') && (value[1] <= ('a' + NUM_ZONES)))
+		if ((strcmp_P(key, PSTR("zone")) == 0) && (value[0] == 'z') && (value[1] > 'a') && (value[1] <= ('a' + NUM_ZONES)))
 		{
 			iZoneNum = value[1] - 'a';
 		}
-		else if (strcmp(key, "state") == 0)
+		else if (strcmp_P(key, PSTR("state")) == 0)
 		{
-			if (strcmp(value, "on") == 0)
+			if (strcmp_P(value, PSTR("on")) == 0)
 				bOn = true;
 			else
 				bOn = false;
@@ -497,21 +633,27 @@ static void ServeFile(FILE * stream_file, const char * fname, SdFile & theFile, 
 		}
 	if (ext > fname)
 	{
-		if (strcmp(ext, "jpg") == 0)
-			ServeHeader(stream_file, 200, "OK", true, "image/jpeg");
-		else if (strcmp(ext, "gif") == 0)
-			ServeHeader(stream_file, 200, "OK", true, "image/gif");
-		else if (strcmp(ext, "css") == 0)
-			ServeHeader(stream_file, 200, "OK", true, "text/css");
-		else if (strcmp(ext, "js") == 0)
-			ServeHeader(stream_file, 200, "OK", true, "application/javascript");
-		else if (strcmp(ext, "ico") == 0)
-			ServeHeader(stream_file, 200, "OK", true, "image/x-icon");
+		if (strcmp_P(ext, PSTR("htm")) == 0)                    // accelerate checks for common case - HTML
+			ServeHeader(stream_file, 200, PSTR("OK"), true);
+		else if (strcmp_P(ext, PSTR("js")) == 0)
+			ServeHeader(stream_file, 200, PSTR("OK"), true, PSTR("application/javascript"));
+		else if (strcmp_P(ext, PSTR("jpg")) == 0)
+			ServeHeader(stream_file, 200, PSTR("OK"), true, PSTR("image/jpeg"));
+		else if (strcmp_P(ext, PSTR("gif")) == 0)
+			ServeHeader(stream_file, 200, PSTR("OK"), true, PSTR("image/gif"));
+		else if (strcmp_P(ext, PSTR("css")) == 0)
+			ServeHeader(stream_file, 200, PSTR("OK"), true, PSTR("text/css"));
+		else if (strcmp_P(ext, PSTR("ico")) == 0)
+			ServeHeader(stream_file, 200, PSTR("OK"), true, PSTR("image/x-icon"));
+		else if ( (strcmp_P(ext, PSTR("log")) == 0) || (strcmp_P(ext, PSTR("LOG")) == 0))
+			ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
+		else if ( (strcmp_P(ext, PSTR("WAT")) == 0) || (strcmp_P(ext, PSTR("TEM")) == 0) || (strcmp_P(ext, PSTR("HUM")) == 0))
+			ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 		else
-			ServeHeader(stream_file, 200, "OK", true);
+			ServeHeader(stream_file, 200, PSTR("OK"), true);
 	}
 	else
-		ServeHeader(stream_file, 200, "OK", true);
+		ServeHeader(stream_file, 200, PSTR("OK"), true);
 
 
 #ifdef ARDUINO
@@ -774,149 +916,166 @@ void web::ProcessWebClients()
 			trace(F("Page:%s\n"), sPage);
 			//ShowSockStatus();
 
-			if (strcmp(sPage, "bin/setSched") == 0)
+			if (strcmp_P(sPage, PSTR("bin/setSched")) == 0)
 			{
 				if (SetSchedule(key_value_pairs))
 				{
 					if (GetRunSchedules())
 						ReloadEvents();
-					ServeHeader(pFile, 200, "OK", false);
+					ServeHeader(pFile, 200, PSTR("OK"), false);
 				}
 				else
 					ServeError(pFile);
 			}
-			else if (strcmp(sPage, "bin/setZones") == 0)
+			else if (strcmp_P(sPage, PSTR("bin/setZones")) == 0)
 			{
 				if (SetZones(key_value_pairs))
 				{
 					ReloadEvents();
-					ServeHeader(pFile, 200, "OK", false);
+					ServeHeader(pFile, 200, PSTR("OK"), false);
 				}
 				else
 					ServeError(pFile);
 			}
-			else if (strcmp(sPage, "bin/delSched") == 0)
+			else if (strcmp_P(sPage, PSTR("bin/delSched")) == 0)
 			{
 				if (DeleteSchedule(key_value_pairs))
 				{
 					if (GetRunSchedules())
 						ReloadEvents();
-					ServeHeader(pFile, 200, "OK", false);
+					ServeHeader(pFile, 200, PSTR("OK"), false);
 				}
 				else
 					ServeError(pFile);
 			}
-			else if (strcmp(sPage, "bin/setQSched") == 0)
+			else if (strcmp_P(sPage, PSTR("bin/setQSched")) == 0)
 			{
 				if (SetQSched(key_value_pairs))
 				{
-					ServeHeader(pFile, 200, "OK", false);
+					ServeHeader(pFile, 200, PSTR("OK"), false);
 				}
 				else
 					ServeError(pFile);
 			}
-			else if (strcmp(sPage, "bin/settings") == 0)
+			else if (strcmp_P(sPage, PSTR("bin/settings")) == 0)
 			{
 				if (SetSettings(key_value_pairs))
 				{
 					ReloadEvents();
-					ServeHeader(pFile, 200, "OK", false);
+					ServeHeader(pFile, 200, PSTR("OK"), false);
 				}
 				else
 					ServeError(pFile);
 			}
-			else if (strcmp(sPage, "bin/manual") == 0)
+			else if (strcmp_P(sPage, PSTR("bin/manual")) == 0)
 			{
 				if (ManualZone(key_value_pairs))
 				{
-					ServeHeader(pFile, 200, "OK", false);
+					ServeHeader(pFile, 200, PSTR("OK"), false);
 				}
 				else
 					ServeError(pFile);
 			}
-			else if (strcmp(sPage, "bin/run") == 0)
+			else if (strcmp(sPage, PSTR("bin/run")) == 0)
 			{
 				if (RunSchedules(key_value_pairs))
 				{
 					ReloadEvents();
-					ServeHeader(pFile, 200, "OK", false);
+					ServeHeader(pFile, 200, PSTR("OK"), false);
 				}
 				else
 					ServeError(pFile);
 			}
-			else if (strcmp(sPage, "bin/factory") == 0)
+			else if (strcmp_P(sPage, PSTR("bin/factory")) == 0)
 			{
 				ResetEEPROM();
 				ReloadEvents();
-				ServeHeader(pFile, 200, "OK", false);
+				ServeHeader(pFile, 200, PSTR("OK"), false);
 			}
-			else if (strcmp(sPage, "bin/reset") == 0)
+			else if (strcmp_P(sPage, PSTR("bin/reset")) == 0)
 			{
-				ServeHeader(pFile, 200, "OK", false);
+				ServeHeader(pFile, 200, PSTR("OK"), false);
 				bReset = true;
 			}
-			else if (strcmp(sPage, "json/schedules") == 0)
+			else if (strcmp_P(sPage, PSTR("json/schedules")) == 0)
 			{
 				JSONSchedules(key_value_pairs, pFile);
 			}
-			else if (strcmp(sPage, "json/zones") == 0)
+			else if (strcmp_P(sPage, PSTR("json/zones")) == 0)
 			{
 				JSONZones(key_value_pairs, pFile);
 			}
-			else if (strcmp(sPage, "json/settings") == 0)
+			else if (strcmp_P(sPage, PSTR("json/settings")) == 0)
 			{
 				JSONSettings(key_value_pairs, pFile);
 			}
-			else if (strcmp(sPage, "json/state") == 0)
+			else if (strcmp_P(sPage, PSTR("json/state")) == 0)
 			{
 				JSONState(key_value_pairs, pFile);
 			}
-			else if (strcmp(sPage, "json/schedule") == 0)
+			else if (strcmp_P(sPage, PSTR("json/schedule")) == 0)
 			{
 				JSONSchedule(key_value_pairs, pFile);
 			}
-			else if (strcmp(sPage, "json/wcheck") == 0)
+			else if (strcmp_P(sPage, PSTR("json/wcheck")) == 0)
 			{
 				JSONwCheck(key_value_pairs, pFile);
 			}
 #ifdef LOGGING
-			else if (strcmp(sPage, "json/logs") == 0)
+#ifdef notdef
+			else if (strcmp_P(sPage, PSTR("json/logs")) == 0)
 			{
 				JSONLogs(key_value_pairs, pFile);
 			}
-			else if (strcmp(sPage, "json/tlogs") == 0)
+#endif //notdef
+			else if (strcmp_P(sPage, PSTR("json/tlogs")) == 0)
 			{
 				JSONtLogs(key_value_pairs, pFile);
 			}
-#endif
-			else if (strcmp(sPage, "ShowSched") == 0)
+#endif //LOGGING
+			else if (strcmp_P(sPage, PSTR("ShowSched")) == 0)
 			{
 				freeMemory();
 				ServeSchedPage(pFile);
 			}
-			else if (strcmp(sPage, "ShowZones") == 0)
+			else if (strcmp_P(sPage, PSTR("ShowZones")) == 0)
 			{
 				freeMemory();
 				ServeZonesPage(pFile);
 			}
-			else if (strcmp(sPage, "ShowEvent") == 0)
+			else if (strcmp_P(sPage, PSTR("ShowEvent")) == 0)
 			{
 				ServeEventPage(pFile);
 			}
-			else if (strcmp(sPage, "ReloadEvent") == 0)
+			else if (strcmp_P(sPage, PSTR("ReloadEvent")) == 0)
 			{
 				ReloadEvents(true);
 				ServeEventPage(pFile);
 			}
+// access system logs directory
+			else if (strncmp_P(sPage, PSTR("logs"), 4) == 0)
+			{
+  				freeMemory();
+				ShowLogs(sPage, pFile, client);
+			}
+// watering logs
+			else if (strncmp_P(sPage, PSTR("watering.log"), 12) == 0)
+			{
+  				freeMemory();
+				ShowWateringLogs(sPage, pFile, client);
+			}
 			else
 			{
-				if (strlen(sPage) == 0)
+  				if (strlen(sPage) == 0){
+    
+ 				        trace(F("Serving: web root\n"));
 					strcpy(sPage, "index.htm");
+                                }
 				// prepend path
 				memmove(sPage + 5, sPage, sizeof(sPage) - 5);
 				memcpy(sPage, "/web/", 5);
 				sPage[sizeof(sPage)-1] = 0;
-				trace(F("Serving Page: %s\n"), sPage);
+				trace(F("Serving file: %s\n"), sPage);
 				SdFile theFile;
 				if (!theFile.open(sPage, O_READ))
 					Serve404(pFile);
