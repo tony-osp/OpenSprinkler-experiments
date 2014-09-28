@@ -40,19 +40,19 @@ limitations under the License.
 
 // Watering activity log directory and file name format (mm-yyyy.wat)
 #define WATERING_LOG_DIR			"/watering.log"
-#define WATERING_LOG_FNAME_FORMAT "/watering.log/%2.2u-%4.4u.wat"
+#define WATERING_LOG_FNAME_FORMAT "/watering.log/wat-%4.4u.%3.3u"
 
 // Water flow data directory and file name format (mm-yyyy.wtr)
 #define WFLOW_LOG_DIR			"/wflow.log"
-#define WFLOW_LOG_FNAME_FORMAT "/wflow.log/%2.2u-%4.4u.wfl"
+#define WFLOW_LOG_FNAME_FORMAT "/wflow.log/wfl-%4.4u.%3.3u"
 
 // Temperature data directory and file name format (mm-yyyy.tem)
 #define TEMPERATURE_LOG_DIR		 	 "/tempr.log"
-#define TEMPERATURE_LOG_FNAME_FORMAT "/tempr.log/%2.2u-%4.4u.tem"
+#define TEMPERATURE_LOG_FNAME_FORMAT "/tempr.log/tem-%4.4u.%3.3u"
 
 // Humidity data directory and file name format (mm-yyyy.hum)
 #define HUMIDITY_LOG_DIR		  "/humid.log"
-#define HUMIDITY_LOG_FNAME_FORMAT "/humid.log/%2.2u-%4.4u.hum"
+#define HUMIDITY_LOG_FNAME_FORMAT "/humid.log/hum-%4.4u.%3.3u"
 
 //
 // Event types for system log

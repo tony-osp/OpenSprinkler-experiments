@@ -5,6 +5,8 @@ as well as temperature/humidity/waterflow/etc logging.
 
 Note: Log operation signature is implemented to be compatible with the Sql-based logging in sprinklers_pi control program.
 
+Log file format is described in log_format2.txt file.
+
 
 Copyright 2014 tony-osp (http://tony-osp.dreamwidth.org/)
 
@@ -123,7 +125,6 @@ bool Logging::begin(char *str)
 //  generate system log file name
   sprintf_P(log_fname, PSTR(SYSTEM_LOG_FNAME_FORMAT), month(curr_time), year(curr_time) );
 
-
   if( !lfile.open(log_fname, O_WRITE | O_APPEND | O_CREAT) ){
 
         trace(F("Cannot open system log file (%s)\n"), log_fname);
@@ -136,7 +137,7 @@ bool Logging::begin(char *str)
 
   logger_ready = true;      // we are good to go
 
-  return syslog_str_P(SYSEVENT_INFO, str);
+  return syslog_str_P(SYSEVENT_INFO, str);    // add system log record using the string provided.
 }
 
 void Logging::Close()
@@ -210,7 +211,7 @@ byte Logging::syslog_str_internal(char evt_type, char *str, char flag)
 
       system_logfile.print(tmp_buf);
 
-// Because this is PROGMEM string we have to output it manually. But SdFat library will buffer output anyway, so it is OK.
+// Because this is PROGMEM string we have to output it manually, one char at a time because we don't want to pre-allocate space for the whole string (RAM is a scarse resource!). But SdFat library will buffer output anyway, so it is OK.
 // SdFat will flush the buffer on close().
       char c;
       while((c = pgm_read_byte(str++))){
@@ -237,7 +238,7 @@ byte Logging::syslog_str_internal(char evt_type, char *str, char flag)
 //
 // Note: for watering events we open/close file on each event
 
-#define MAX_WATERING_LOG_RECORD_SIZE    64
+#define MAX_WATERING_LOG_RECORD_SIZE    80
 
 bool Logging::LogZoneEvent(time_t start, int zone, int duration, int schedule, int sadj, int wunderground)
 {
@@ -246,15 +247,20 @@ bool Logging::LogZoneEvent(time_t start, int zone, int duration, int schedule, i
 // temp buffer for log strings processing
       char tmp_buf[MAX_WATERING_LOG_RECORD_SIZE];
 
-      sprintf_P(tmp_buf, PSTR(WATERING_LOG_FNAME_FORMAT), month(t), year(t) );
+      sprintf_P(tmp_buf, PSTR(WATERING_LOG_FNAME_FORMAT), year(t), zone );
 
-      if( !wfile.open(tmp_buf, O_WRITE | O_APPEND | O_CREAT) ){
+      if( !wfile.open(tmp_buf, O_WRITE | O_APPEND) ){    // we are trying to open existing log file for write/append
 
-            trace(F("Cannot open watering log file (%s)\n"), tmp_buf);
-            return false;    // failed to open/create file
+// operation failed, usually because log file for this year does not exist yet. Let's create it and add column headers.
+         if( !wfile.open(tmp_buf, O_WRITE | O_APPEND | O_CREAT) ){
+
+               trace(F("Cannot open watering log file (%s)\n"), tmp_buf);    // file create failed, return an error.
+               return false;    // failed to open/create file
+         }
+         wfile.println(F("Month,Day,Time,Run time(min),ScheduleID,Adjustment,WUAdjustment"));
       }
 
-      sprintf_P(tmp_buf, PSTR("%u,%u:%u,%u,%u,%u,%i,%i"), day(start), hour(start), minute(start), zone, duration, schedule, sadj, wunderground);
+      sprintf_P(tmp_buf, PSTR("%u,%u,%u:%u,%u,%u,%i,%i"), month(start), day(start), hour(start), minute(start), duration, schedule, sadj, wunderground);
 
       wfile.println(tmp_buf);
       wfile.close();
@@ -376,38 +382,31 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
 {
         char m;
         char tmp_buf[MAX_WATERING_LOG_RECORD_SIZE];
-        int    nyear=year(start);
 
         if (start == 0)
                 start = nntpTimeServer.LocalNow();
 
+        int    nyear=year(start);
+
         end = max(start,end) + 24*3600;  // add 1 day to end time.
 
-        for( m = month(start); m<=month(end); m++ ){  // iterate over months between start and end
-
-//                trace(F("Looping through log files, month=%u\n"), m );
+        int curr_zone = 255;
+        for( int xzone = 1; xzone <= NUM_ZONES; xzone++ ){
 
                 SdFile lfile;
-                sprintf_P(tmp_buf, PSTR(WATERING_LOG_FNAME_FORMAT), m, year(start) );
+                sprintf_P(tmp_buf, PSTR(WATERING_LOG_FNAME_FORMAT), nyear, xzone );
 
-                if( !lfile.open(tmp_buf, O_READ) ){
+                if( lfile.open(tmp_buf, O_READ) ){
 
-                       trace(F("Cannot open watering log file for read (%s)\n"), tmp_buf);
-                       return false;    // failed to open file
-                }
+                    char bFirstRow = true;
+
+                     lfile.fgets(tmp_buf, MAX_WATERING_LOG_RECORD_SIZE);  // skip first line in the file - column headers
+
 // OK, we opened required watering log file. Iterate over records, filtering out necessary dates range
-
-                int xmaxzone = 1;    // we will find out maximum zone number on the first pass
-                int curr_zone = 255;
-                for( int xzone = 1; xzone <= xmaxzone; xzone++ ){
                   
-                     char bFirstRow = true;
-                     lfile.rewind();
-
                      while( lfile.available() ){
 
-                            int  nday = 0, nhour = 0, nminute = 0;
-                            int nzone = 0, nschedule = 0;
+                            int  nmonth = 0, nday = 0, nhour = 0, nminute = 0, nschedule = 0;
                             int  nduration = 0,  nsadj = 0, nwunderground = 0;
 
                             int bytes = lfile.fgets(tmp_buf, MAX_WATERING_LOG_RECORD_SIZE);
@@ -416,15 +415,13 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
 
 // Parse the string into fields. First field (up to two digits) is the day of the month
 
-                            sscanf_P( tmp_buf, PSTR("%u,%u:%u,%u,%i,%i,%i,%i"),
-                                                            &nday, &nhour, &nminute, &nzone, &nduration, &nschedule, &nsadj, &nwunderground);
+                            sscanf_P( tmp_buf, PSTR("%u,%u,%u:%u,%i,%i,%i,%i"),
+                                                            &nmonth, &nday, &nhour, &nminute, &nduration, &nschedule, &nsadj, &nwunderground);
 
                             if( nday > day(end) )    // check for the end date
                                          break;
 
-                            if( (nzone>xmaxzone) && (nzone<=NUM_ZONES) ) xmaxzone = nzone;    // NUM_ZONES is the upper limit, to avoid blocking device in a case of a bogus log file
-
-                            if( (nday >= day(start)) && (nzone == xzone) ){        // the record is within required range. m is the month, nday is the day of the month, xzone is the zone we are currently emitting
+                            if( nday >= day(start) ){        // the record is within required range. m is the month, nday is the day of the month, xzone is the zone we are currently emitting
 
 // we have something to output.
 
@@ -438,7 +435,7 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
                                          bFirstRow = true;
                                     }
 
-                                    tmElements_t tm;   tm.Day = nday;  tm.Year = year(start) - 1970;  tm.Hour = nhour;  tm.Minute = nminute;  tm.Second = 0;
+                                    tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = nhour;  tm.Minute = nminute;  tm.Second = 0;
                             
                                     fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t { \"date\":%lu, \"duration\":%i, \"schedule\":%i, \"seasonal\":%i, \"wunderground\":%i}"),
                                                                        bFirstRow ? "":",",
@@ -446,12 +443,13 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
 
                                      bFirstRow = false;
                             }
-                      }
+                     }   // while
+                     lfile.close();
                 }
-                if( curr_zone != 255)
-                         fprintf_P(stream_file, PSTR("\n\t\t\t\t\t ] \n\t\t\t\t } \n"));    // JSON zone footer
-                lfile.close();
-        }
+        }   // for( int xzone = 1; xzone <= xmaxzone; xzone++ )
+
+        if( curr_zone != 255)
+                     fprintf_P(stream_file, PSTR("\n\t\t\t\t\t ] \n\t\t\t\t } \n"));    // JSON zone footer
 
         return true;
 }

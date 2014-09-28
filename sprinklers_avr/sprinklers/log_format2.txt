@@ -2,9 +2,7 @@
 ***                                                                                                           ***
 ***                                                   NOTE                                                    ***
 ***                                                                                                           ***
-*** This log file format is obsolete. Watering and sensors log file format was changed to zone/sensor per file***
-***                                                                                                           ***
-*** New file format is defined in log_format2.txt                                                             ***
+*** This the new (v2.0) log file format definition. Old (v1.0) log file format is defined in log_format.txt   ***
 ***                                                                                                           ***
 *****************************************************************************************************************
 
@@ -25,11 +23,20 @@ One event per line, max line length - 255 characters. Encoding - ASCII.
 
 Watering events log (files in /watering.log directory)
 
-File name: mm-yyyy.wat
+File name: wat-yyyy.nnn, where yyyy - year, nnn - zone number. Zone number is always 3 digits (padded with zeroes).
 
-1. Day of the month (one or two digits)
-2. Time in "hh:mm" format
-3. Zone ID (one or two digits)
+First line of file defines columns:
+
+Month,Day,Time,Run time(min),ScheduleID,Adjustment,WUAdjustment
+
+This first line is helpful for applications capable of importing CSV files (e.g. Excel), it is also used to have easy to use
+format information since it defines columns meaning.
+
+The rest of the file consists of the records of the following format:
+                                                                     
+1. Month (one or two digits)
+2. Day of the month (one or two digits)
+3. Time in "hh:mm" format
 4. Run time in minutes
 5. Schedule ID
 6. Adjustment
@@ -41,17 +48,26 @@ One event per line. ASCII encoding.
 
 Water flow meters data (files in /wflow.log directory)
 
-File name: mm-yyyy.wfl
+File name: wfl-yyyy.nnn, where yyyy - year, nnn - sensor number. Sensor number is always 3 digits (padded with zeroes).
 
-1. Day of the month (one or two digits)
-2. Time in "hh:mm" format
-3. Water sensor ID (one or two digits)
-4. Water flow reading (e.g. "2.5")
+First line of file defines columns:
+
+Month,Day,Time,WaterFlow,Duration(sec)
+
+This first line is helpful for applications capable of importing CSV files (e.g. Excel), it is also used to have easy to use
+format information since it defines columns meaning.
+
+The rest of the file consists of the records of the following format:
+                                                                     
+1. Month (one or two digits)
+2. Day of the month (one or two digits)
+3. Time in "hh:mm" format
+4. Water flow reading (e.g. 2.5)
 5. Duration in seconds
 
 One event per line. ASCII encoding.
 
-When multiple water flow sensors are installed additional sensors data can be represented by separate records, one record per sensor.
+When multiple water flow sensors are installed additional sensors data can be represented by separate files.
 Water flow readings are assumed to be in gallons.
 Time duration indicates the period of time this water flow reading is for. E.g. if water flow reading is 2.5, and time is 300,
 it means that during the last 5 minutes (300 seconds) sensor detected the flow of 2.5 gallons of water.
@@ -66,12 +82,21 @@ absence of the water flow. When water flow is detected updates/records are expec
 
 Temperature sensors data (files in /tempr.log directory)
 
-File name: mm-yyyy.tem
+File name: tem-yyyy.nnn, where yyyy - year, nnn - sensor number. Sensor number is always 3 digits (padded with zeroes).
 
-1. Day of the month (one or two digits)
-2. Time in "hh:mm" format
-3. Temperature sensor ID (one or two digits)
-4. Temperature (e.g. "70.5")
+First line of file defines columns:
+
+Month,Day,Time,Temperature(F)
+
+This first line is helpful for applications capable of importing CSV files (e.g. Excel), it is also used to have easy to use
+format information since it defines columns meaning.
+
+The rest of the file consists of the records of the following format:
+                                                                     
+1. Month (one or two digits)
+2. Day of the month (one or two digits)
+3. Time in "hh:mm" format
+4. Temperature (e.g. 70.5)
 
 One event per line. ASCII encoding.
 
@@ -82,12 +107,21 @@ Temperature is assumed to be in Fahrenheit.
 
 Humidity sensors data (files in /humid.log directory)
 
-File name: mm-yyyy.hum
+File name: hum-yyyy.nnn, where yyyy - year, nnn - sensor number. Sensor number is always 3 digits (padded with zeroes).
 
-1. Day of the month (one or two digits)
-2. Time in "hh:mm" format
-3. Humidity sensor ID (one or two digits)
-4. Humidity reading (e.g. "60")
+First line of file defines columns:
+
+Month,Day,Time,Humidity
+
+This first line is helpful for applications capable of importing CSV files (e.g. Excel), it is also used to have easy to use
+format information since it defines columns meaning.
+
+The rest of the file consists of the records of the following format:
+                                                                     
+1. Month (one or two digits)
+2. Day of the month (one or two digits)
+3. Time in "hh:mm" format
+4. Humidity reading (e.g. 60)
 
 One event per line. ASCII encoding.
 
