@@ -1,0 +1,9 @@
+To upload files to the Sprinklers controller from windows box you can use any tftp client.
+
+For example, you can use standard, built-in Windows tftp client, which can be added from
+Control Panel->Programs and Features->Turn Windows Features On/Off->TFTP Client.
+
+Command line:
+tfpt -i controller-ip-address PUT index.htm "web/index.htm"
+
+Instead of index.htm you can specify any other file to upload.
