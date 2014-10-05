@@ -57,7 +57,6 @@ byte get_button_async(byte mode);
 byte weekday_today(void);
 int get_key(unsigned int input);
 void buttons_loop(void);
-unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis);
 void manual_station_on(byte sid, int ontimer);
 
 
@@ -91,6 +90,24 @@ char* days_str[7] = {
   str_day5,
   str_day6
 };
+
+// maximum ulong value
+#define MAX_ULONG       4294967295
+
+// Helper inline function
+//
+// Subtract two millis values and return delta
+// Takes into account counter rollover
+//
+inline unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis)
+{
+  if( new_millis > old_millis ) return (new_millis-old_millis); // main case - new is bigger than old
+
+// new millis is smaller than old millis which means - overflow. Calculate correct value
+
+  unsigned long delta = MAX_ULONG - old_millis; delta += new_millis;    // do math in two steps to ensure no overflow
+  return delta;
+}
 
 
 // initialization. Intended to be called from setup()
@@ -212,7 +229,7 @@ byte OSLocalUI::callHandler(byte needs_refresh)
  //
  byte OSLocalUI::modeHandler_Home(byte forceRefresh)
  {
-   static unsigned long last_time = 0;
+   static unsigned long old_millis = 0;
 
 // assert
    if( osUI_Mode != OSUI_MODE_HOME )  return false;  // Basic protection to ensure current UI mode is actually HOME mode.
@@ -254,18 +271,20 @@ byte OSLocalUI::callHandler(byte needs_refresh)
    }
 
  // Show time and station status
-   // if 1 second has passed
-  time_t curr_time = nntpTimeServer.LocalNow();
-  if( (last_time != curr_time) || forceRefresh !=0 ) {  // update UI once a second, OR if explicit refresh is required
+// if 1 second has passed
+  unsigned long  new_millis = millis();    // Note: we are using built-in Arduino millis() function instead of now() or time-zone adjusted LocalNow(), because it is a lot faster
+                                                             // and for detecting second change it does not make any difference.
 
-    last_time = curr_time;
+  if( (subt_millis(new_millis, old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second, OR if explicit refresh is required
+
+    old_millis = new_millis;
     lcd_print_time(0);       // print time
 
     // process LCD display
     if(SHOW_MEMORY)
       lcd_print_memory(1);
     else
-      lcd_print_station(1, ui_anim_chars[curr_time%3]);
+      lcd_print_station(1, ui_anim_chars[now()%3]);
   }
 
   return true;
@@ -276,7 +295,7 @@ byte OSLocalUI::callHandler(byte needs_refresh)
 byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
 {
   static byte sel_manual_ch = 0;
-  static time_t last_time = 0;
+  static unsigned long old_millis = 0;
   static byte man_state = 0;                    // this flag indicates the UI state within MANUAL mode. Valid states are:
                                                                         // 0 - initial screen, select the channel
                                                                         // 1 - entering number of minutes to run
@@ -295,7 +314,8 @@ byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
           sel_manual_ch = 0;
           forceRefresh == 1;    // need to update the screen
   }
-  time_t curr_time = nntpTimeServer.LocalNow();
+  unsigned long new_millis = millis();
+//  time_t curr_time = now();
 
   char btn = get_button_async(1);    // Note: we allow Autorepeat in this mode, to help enter data quickly
 
@@ -331,10 +351,12 @@ byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
                 return  true;    // exit. Actual minutes display will happen on the next loop();
          }
 
-     if( (last_time != curr_time) || (forceRefresh != 0) ) {  // update UI once a second (for blinking), OR if explicit refresh is required
+     if( (subt_millis(new_millis, old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second (for blinking), OR if explicit refresh is required
 
-       last_time = curr_time;
-       lcd_print_station(1, '_', sel_manual_ch, (curr_time%2) ? '#':'_');       // this will blink selected station
+//     if( (last_time != curr_time) || (forceRefresh != 0) ) {  // update UI once a second (for blinking), OR if explicit refresh is required
+
+       old_millis = new_millis;
+       lcd_print_station(1, '_', sel_manual_ch, (now()%2) ? '#':'_');       // this will blink selected station
      }
   }
 
@@ -379,14 +401,15 @@ byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
                 return true;
      }
 // now screen update and blinking cursor
-     if( (last_time != curr_time) || (forceRefresh !=0) ) {  // update UI once a second (for blinking), OR if explicit refresh is required
+     if( (subt_millis(new_millis, old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second (for blinking), OR if explicit refresh is required
+//     if( (last_time != curr_time) || (forceRefresh !=0) ) {  // update UI once a second (for blinking), OR if explicit refresh is required
 
-           last_time = curr_time;
+           old_millis = new_millis;
 
            lcd.setCursor(0, 1);
            lcd_print_2digit(num_min);
-           if( curr_time%2 ) lcd_print_pgm(PSTR("   "));
-           else                      lcd_print_pgm(PSTR("#  "));
+           if( now()%2 ) lcd_print_pgm(PSTR("   "));
+           else                   lcd_print_pgm(PSTR("#  "));
      }
 
   }

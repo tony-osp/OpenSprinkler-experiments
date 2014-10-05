@@ -34,7 +34,22 @@ limitations under the License.
 
 // local forward declarations
 
-unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis);
+
+// maximum ulong value
+#define MAX_ULONG       4294967295
+
+// Subtract two millis values and return delta
+// Takes into account counter rollover
+//
+inline unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis)
+{
+  if( new_millis > old_millis ) return (new_millis-old_millis); // main case - new is bigger than old
+
+// new millis is smaller than old millis which means - overflow. Calculate correct value
+
+  unsigned long delta = MAX_ULONG - old_millis; delta += new_millis;    // do math in two steps to ensure no overflow
+  return delta;
+}
 
 #ifdef ANALOG_KEY_INPUT
 
@@ -185,20 +200,6 @@ byte get_button_async(byte mode)
   return BUTTON_NONE;
 }
 
-// maximum ulong value
-#define MAX_ULONG       4294967295
 
-// Subtract two millis values and return delta
-// Takes into account counter rollover
-//
-unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis)
-{
-  if( new_millis > old_millis ) return (new_millis-old_millis); // main case - new is bigger than old
-
-// new millis is smaller than old millis which means - overflow. Calculate correct value
-
-  unsigned long delta = MAX_ULONG - old_millis; delta += new_millis;    // do math in two steps to ensure no overflow
-  return delta;
-}
 
 
