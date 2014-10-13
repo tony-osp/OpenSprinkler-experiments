@@ -178,7 +178,7 @@ static void ShowLogs(char *sPage, FILE * pFile, EthernetClient client)
             }
 
             entry.getFilename(fname);
-            fprintf_P( pFile, PSTR("<tr> <td> <a href=\"/logs/%s\">%s</a> </td> <td>&nbsp&nbsp</td> <td>%u </td> </tr>"), fname, fname, entry.fileSize() ); 
+            fprintf_P( pFile, PSTR("<tr> <td> <a href=\"/logs/%s\">%s</a> </td> <td>&nbsp&nbsp</td> <td>%lu </td> </tr>"), fname, fname, entry.fileSize() ); 
             entry.close();
        }
        logfile.close();
@@ -238,7 +238,7 @@ static void ShowWateringLogs(char *sPage, FILE * pFile, EthernetClient client)
             }
 
             entry.getFilename(fname);
-            fprintf_P( pFile, PSTR("<tr> <td> <a href=\"/watering.log/%s\">%s</a> </td> <td>&nbsp&nbsp</td> <td>%u </td> </tr>"), fname, fname, entry.fileSize() ); 
+            fprintf_P( pFile, PSTR("<tr> <td> <a href=\"/watering.log/%s\">%s</a> </td> <td>&nbsp&nbsp</td> <td>%lu </td> </tr>"), fname, fname, entry.fileSize() ); 
             entry.close();
        }
        logfile.close();
@@ -264,7 +264,6 @@ static void ShowWateringLogs(char *sPage, FILE * pFile, EthernetClient client)
 }
 
 
-#ifdef notdef
 static void JSONLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 {
 	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
@@ -297,10 +296,9 @@ static void JSONLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 		}
 	}
 
-	log.GraphZone(stream_file, sdate, edate, grouping);
+	sdlog.GraphZone(stream_file, sdate, edate, grouping);
 	fprintf_P(stream_file, PSTR("}"));
 }
-#endif //notdef
 
 static void JSONtLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 {
@@ -647,7 +645,7 @@ static void ServeFile(FILE * stream_file, const char * fname, SdFile & theFile, 
 			ServeHeader(stream_file, 200, PSTR("OK"), true, PSTR("image/x-icon"));
 		else if ( (strcmp_P(ext, PSTR("log")) == 0) || (strcmp_P(ext, PSTR("LOG")) == 0))
 			ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
-		else if ( (strcmp_P(ext, PSTR("WAT")) == 0) || (strcmp_P(ext, PSTR("TEM")) == 0) || (strcmp_P(ext, PSTR("HUM")) == 0))
+		else if ( ext[0] == '0' && ext[1] == '0' )
 			ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
 		else
 			ServeHeader(stream_file, 200, PSTR("OK"), true);
@@ -1022,12 +1020,10 @@ void web::ProcessWebClients()
 				JSONwCheck(key_value_pairs, pFile);
 			}
 #ifdef LOGGING
-#ifdef notdef
 			else if (strcmp_P(sPage, PSTR("json/logs")) == 0)
 			{
 				JSONLogs(key_value_pairs, pFile);
 			}
-#endif //notdef
 			else if (strcmp_P(sPage, PSTR("json/tlogs")) == 0)
 			{
 				JSONtLogs(key_value_pairs, pFile);

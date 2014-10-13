@@ -33,7 +33,9 @@
 #include <SDFat.h>
 #include <LiquidCrystal.h>
 #include "LocalUI.h"
-#include "sd-log.h"
+#include "sdlog.h"
+#include <SFE_BMP180.h>
+#include <Wire.h>
 
 OSLocalUI localUI;
 

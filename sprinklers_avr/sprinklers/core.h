@@ -16,7 +16,7 @@
 #include <inttypes.h>
 #include "port.h"
 #ifdef LOGGING
-#include "sd-log.h"
+#include "sdlog.h"
 extern Logging sdlog;
 #endif
 

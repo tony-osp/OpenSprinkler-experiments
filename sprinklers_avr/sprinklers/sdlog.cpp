@@ -25,13 +25,17 @@ limitations under the License.
 */
 
 #define __STDC_FORMAT_MACROS
-#include "sd-log.h"
+#include "sdlog.h"
 #include "port.h"
 #include "settings.h"
 
 extern SdFat sd;
 
 #define CL_TMPB_SIZE  256    // size of the local temporary buffer
+
+// Local forward declarations
+
+
 
 Logging::Logging()
 {
@@ -73,7 +77,7 @@ bool Logging::begin(char *str)
   }
   lfile.close();      // close the directory
 
-  sprintf_P(log_fname, PSTR(WATERING_LOG_DIR));   // watering log directory
+  sprintf_P(log_fname, PSTR(WATERING_LOG_DIR));   // Watering log directory
   if( !lfile.open(log_fname, O_READ) ){
 
         trace(F("Watering log directory not found, creating it.\n"));
@@ -109,7 +113,7 @@ bool Logging::begin(char *str)
   }
   lfile.close();      // close the directory
 
-  sprintf_P(log_fname, PSTR(HUMIDITY_LOG_DIR));   // Temperature log directory
+  sprintf_P(log_fname, PSTR(HUMIDITY_LOG_DIR));   // Humidity log directory
   if( !lfile.open(log_fname, O_READ) ){
 
         trace(F("Humidity log directory not found, creating it.\n"));
@@ -117,6 +121,18 @@ bool Logging::begin(char *str)
         if( !sd.mkdir(log_fname) ){
 
            trace(F("Error creating Humidity log directory.\n"));
+        }
+  }
+  lfile.close();      // close the directory
+
+  sprintf_P(log_fname, PSTR(PRESSURE_LOG_DIR));   // Atmospheric pressure log directory
+  if( !lfile.open(log_fname, O_READ) ){
+
+        trace(F("Humidity log directory not found, creating it.\n"));
+
+        if( !sd.mkdir(log_fname) ){
+
+           trace(F("Error creating Pressure log directory.\n"));
         }
   }
   lfile.close();      // close the directory
@@ -268,115 +284,255 @@ bool Logging::LogZoneEvent(time_t start, int zone, int duration, int schedule, i
       return true;
 }
 
-
-#ifdef notdef
-
-static void DumpData(FILE * stream_file, uint32_t bin_data[], uint32_t bins, uint32_t bin_scale, uint32_t bin_offset, bool bMil)
+// Sensors logging - record sensor reading. 
+// Covers all types of basic pressure sensors that provide momentarily (immediate) readings.
+//
+// sensor_type       -  could be SENSOR_TYPE_TEMPERATURE or any other valid defines
+// sensor_id           -  numeric ID of the sensor, minimum 0, maximum 999
+// sensor_reading  -  actual sensor reading
+//
+// Returns true if successful and false if failure.
+//
+bool Logging::LogSensorReading(char sensor_type, int sensor_id, int sensor_reading)
 {
-        for (uint32_t i=0; i<bins; i++)
-                fprintf(stream_file, "%s[%" PRIu32 "%s, %" PRIu32 "]", (i==0)?"":",", bin_offset + i*bin_scale, bMil?"000":"", bin_data[i]);
+//    trace(F("LogSensorReading - enter\n"));
+  
+      SdFile  wfile;
+      time_t t = nntpTimeServer.LocalNow();
+
+// temp buffer for log strings processing
+      char tmp_buf[20];
+      char *sensorName;
+
+      switch (sensor_type){
+      
+           case  SENSOR_TYPE_TEMPERATURE:
+          
+                     sprintf_P(tmp_buf, PSTR(TEMPERATURE_LOG_FNAME_FORMAT), year(t), sensor_id );
+                     sensorName = PSTR("Temperature(F)");
+                     break; 
+      
+           case  SENSOR_TYPE_PRESSURE:
+
+                     sprintf_P(tmp_buf, PSTR(PRESSURE_LOG_FNAME_FORMAT), year(t), sensor_id );
+                     sensorName = PSTR("AirPressure");
+                     break; 
+      
+           case  SENSOR_TYPE_HUMIDITY:
+          
+                     sprintf_P(tmp_buf, PSTR(HUMIDITY_LOG_FNAME_FORMAT), year(t), sensor_id );
+                     sensorName = PSTR("Humidity");
+                     break; 
+      
+            default:
+                     return false;    // sensor_type not recognized
+                     break;           
+      }
+//    trace(F("LogSensorReading - about to open file: %s\n"), tmp_buf);
+
+      if( !wfile.open(tmp_buf, O_WRITE | O_APPEND) ){    // we are trying to open existing log file for write/append
+
+// operation failed, usually because log file for this year does not exist yet. Let's create it and add column headers.
+         if( !wfile.open(tmp_buf, O_WRITE | O_APPEND | O_CREAT) ){
+
+               trace(F("Cannot open sensor  log file (%s)\n"), tmp_buf);    // file create failed, return an error.
+               return false;    // failed to open/create file
+         }
+         wfile.print(F("Month,Day,Time,"));  sprintf_P(tmp_buf, PSTR("%S"), sensorName);  wfile.println(tmp_buf);
+         
+//         trace(F("creating new log file for sensor:%S"), sensorName);
+      }
+
+      sprintf_P(tmp_buf, PSTR("%u,%u,%u:%u,%d"), month(t), day(t), hour(t), minute(t), sensor_reading);
+      wfile.println(tmp_buf);
+      
+      wfile.close();
+      
+      return true;    // standard exit-success
 }
 
-#endif  // disabled for now
 
 bool Logging::GraphZone(FILE* stream_file, time_t start, time_t end, GROUPING grouping)
 {
-#ifdef notdef
-
-        if (start == 0)
-                start = nntpTimeServer.LocalNow();
-        end = max(start,end) + 24*3600;  // add 1 day to end time.
-
         grouping = max(NONE, min(grouping, MONTHLY));
-        char sSQL[200];
-        uint16_t bins = 0;
+        char       bins = 0;
         uint32_t bin_offset = 0;
         uint32_t bin_scale = 1;
+
         switch (grouping)
         {
         case HOURLY:
-                snprintf(sSQL, sizeof(sSQL),
-                                "SELECT zone, strftime('%%H', date, 'unixepoch') as hour, SUM(duration)"
-                                " FROM zonelog WHERE date BETWEEN %lu AND %lu"
-                                " GROUP BY zone,hour ORDER BY zone,hour",
-                                start, end);
                 bins = 24;
                 break;
+
         case DAILY:
-                snprintf(sSQL, sizeof(sSQL),
-                                "SELECT zone, strftime('%%w', date, 'unixepoch') as bucket, SUM(duration)"
-                                " FROM zonelog WHERE date BETWEEN %lu AND %lu"
-                                " GROUP BY zone,bucket ORDER BY zone,bucket",
-                                start, end);
                 bins = 7;
                 break;
+
         case MONTHLY:
-                snprintf(sSQL, sizeof(sSQL),
-                                "SELECT zone, strftime('%%m', date, 'unixepoch') as bucket, SUM(duration)"
-                                " FROM zonelog WHERE date BETWEEN %lu AND %lu"
-                                " GROUP BY zone,bucket ORDER BY zone,bucket",
-                                start, end);
                 bins = 12;
                 break;
+
         case NONE:
-                bins = 100;
+                bins = 10;
                 bin_offset = start;
                 bin_scale = (end-start)/bins;
-                snprintf(sSQL, sizeof(sSQL),
-                                "SELECT zone, ((date-%lu)/%" PRIu32 ") as bucket, SUM(duration)"
-                                " FROM zonelog WHERE date BETWEEN %lu AND %lu"
-                                " GROUP BY zone,bucket ORDER BY zone,bucket",
-                                start, bin_scale, start, end);
                 break;
-        }
-
-        // Make sure we've zero terminated this string.
-        sSQL[sizeof(sSQL)-1] = 0;
-
-        trace("%s\n", sSQL);
-
-        sqlite3_stmt * statement;
-        // Now determine if we're running V1.0 of the schema.
-        int res = sqlite3_prepare_v2(m_db, sSQL, -1, &statement, NULL);
-        if (res)
-        {
-                trace("Prepare Failure (%s)\n", sqlite3_errmsg(m_db));
-                return false;
         }
 
         int current_zone = -1;
         bool bFirstZone = true;
-        uint32_t bin_data[bins];
-        memset(bin_data, 0, bins*sizeof(uint32_t));
-        while (sqlite3_step(statement) == SQLITE_ROW)
-        {
-                int zone = sqlite3_column_int(statement, 0);
-                if (current_zone != zone)
-                {
-                        current_zone = zone;
-                        if (!bFirstZone)
-                                DumpData(stream_file, bin_data, bins, bin_scale, bin_offset, grouping == NONE);
-                        fprintf(stream_file, "%s\t\"%d\" : [", bFirstZone?"":"],\n", zone);
-                        memset(bin_data, 0, bins*sizeof(uint32_t));
-                        bFirstZone = false;
-                }
-                uint32_t bin = sqlite3_column_int(statement, 1);
-                uint32_t value = sqlite3_column_int(statement, 2);
-                bin_data[bin] = value;
-        }
-        if (!bFirstZone)
-        {
-                DumpData(stream_file, bin_data, bins, bin_scale, bin_offset, grouping == NONE);
-                fprintf(stream_file, "]\n");
-        }
+        long int bin_data[bins];
 
-        sqlite3_finalize(statement);
+        char tmp_buf[MAX_WATERING_LOG_RECORD_SIZE];
 
-#endif   //disabled for now
+        if (start == 0)
+                start = nntpTimeServer.LocalNow();
+
+        int    nyear=year(start);
+
+        end = max(start,end) + 24*3600;  // add 1 day to end time.
+
+        int curr_zone = 255;
+        char bFirstRow = true;
+
+        for( int xzone = 1; xzone <= NUM_ZONES; xzone++ ){  // iterate over zones
+
+                    int bin_res = getZoneBins( xzone, start, end, bin_data, bins, grouping);
+                    if( bin_res > 0 ){  // some data available
+                    
+                                    if( curr_zone != xzone ){
+                                      
+                                         if( curr_zone != 255 ) 
+                                                   fprintf_P(stream_file, PSTR("], "));   // if this is not the first zone, add comma to the previous one
+                                         
+                                         fprintf_P(stream_file, PSTR("\n\t \"%d\": ["), xzone);   // JSON zone header
+                                         curr_zone = xzone;
+                                         bFirstRow = true;
+                                    }
+
+                                     bFirstRow = false;
+                                     for (int i=0; i<bins; i++)
+                                               fprintf(stream_file, "%s[%i, %lu]", (i==0)?"":",", i, bin_data[i]);
+
+                    }  // if(bin_res>0)
+                    
+        }   // for( int xzone = 1; xzone <= xmaxzone; xzone++ )
+
+        if( curr_zone != 255)
+                     fprintf_P(stream_file, PSTR("\n\t\t\t\t\t ] \n"));    // close the last zone if we emitted
 
         return true;
 }
 
+int Logging::getZoneBins( int zone, time_t start, time_t end, long int bin_data[], int bins, GROUPING grouping)
+{
+        char tmp_buf[MAX_WATERING_LOG_RECORD_SIZE];
+        int    bin_counter[bins];
+        int    r_counter = 0;
+        
+        memset( bin_counter, 0, bins*sizeof(int) );
+        memset( bin_data, 0, bins*sizeof(long int) );
+
+        if (start == 0)
+                start = nntpTimeServer.LocalNow();
+
+        int    nyear=year(start);
+
+        end = max(start,end) + 24*3600;  // add 1 day to end time.
+
+        unsigned int  nmend = month(end);
+        unsigned int  ndayend = day(end);
+
+        if( year(end) != year(start) ){     // currently we cannot handle queries that span multiple years. Truncate the query to the year end.
+
+             nmend = 12;    ndayend = 31;
+        }
+        
+        SdFile lfile;
+        sprintf_P(tmp_buf, PSTR(WATERING_LOG_FNAME_FORMAT), nyear, zone );
+
+        if( !lfile.open(tmp_buf, O_READ) ){  // logs for each zone are stored in a separate file, with the file name based on the year and zone number. Try to open it.
+
+             return -1;  // cannot open watering log file
+        }
+        char bFirstRow = true;
+
+        lfile.fgets(tmp_buf, MAX_WATERING_LOG_RECORD_SIZE);  // skip first line in the file - column headers
+
+// OK, we opened required watering log file. Iterate over records, filtering out necessary dates range
+                  
+        while( lfile.available() ){
+
+                    unsigned int nhour = 0, nmonth = 0, nday = 0, nminute = 0;
+                    int  nduration = 0, nschedule = 0;
+                    int  nsadj = 0, nwunderground = 0;
+
+                    int bytes = lfile.fgets(tmp_buf, MAX_WATERING_LOG_RECORD_SIZE);
+                    if (bytes <= 0)
+                                  break;
+
+// Parse the string into fields. First field (up to two digits) is the day of the month
+
+                    sscanf_P( tmp_buf, PSTR("%u,%u,%u:%u,%i,%i,%i,%i"),
+                                                    &nmonth, &nday, &nhour, &nminute, &nduration, &nschedule, &nsadj, &nwunderground);
+
+                    if( (nmonth > nmend) || ((nmonth == nmend) && (nday > ndayend)) )    // check for the end date
+                                 break;
+
+                    switch (grouping)
+                    {
+                         case HOURLY:
+                         if( nhour <= 24 ){    // basic protection to ensure corrupted data will not crash the system
+                     
+                              bin_data[nhour] += (long int)nduration;
+                              bin_counter[nhour]++;
+                         }
+                         break;
+
+                         case DAILY:
+                         {
+                                  tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = nhour;  tm.Minute = nminute;  tm.Second = 0; 
+                                  unsigned int  dow=weekday(makeTime(tm));
+                                  
+                                  if( dow <= 7 ){    // basic protection to ensure corrupted data will not crash the system
+                     
+                                            bin_data[dow] += (long int)nduration;
+                                            bin_counter[dow]++;
+                                  }
+                         }
+                         break;
+
+                         case MONTHLY:
+                         if( nmonth <= 12 ){    // basic protection to ensure corrupted data will not crash the system
+                     
+                              bin_data[nmonth] += (long int)nduration;
+                              bin_counter[nmonth]++;
+                         }
+                         break;
+
+                         default:
+                                 return -2;  // unsupported grouping                        
+                         break;
+                    }  // switch(grouping)
+        } // while
+        
+        lfile.close();
+        
+//        trace(F("Zone=%i. Scaling bins, num bins=%i\n"), zone, bins);
+        
+        for( int i=0; i<bins; i++ ){
+          
+//              trace(F("i=%i, bin_data[i]=%lu, bin_counter[i]=%i\n"), i, bin_data[i], bin_counter[i]);
+              if( bin_counter[i] != 0 ){
+                
+                       bin_data[i] = bin_data[i]/(long int)bin_counter[i];   
+                       r_counter ++;
+              }
+        }
+  
+        return r_counter;
+}
 
 bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
 {
@@ -391,12 +547,12 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
         end = max(start,end) + 24*3600;  // add 1 day to end time.
 
         int curr_zone = 255;
-        for( int xzone = 1; xzone <= NUM_ZONES; xzone++ ){
+        for( int xzone = 1; xzone <= NUM_ZONES; xzone++ ){  // iterate over zones
 
                 SdFile lfile;
                 sprintf_P(tmp_buf, PSTR(WATERING_LOG_FNAME_FORMAT), nyear, xzone );
 
-                if( lfile.open(tmp_buf, O_READ) ){
+                if( lfile.open(tmp_buf, O_READ) ){  // logs for each zone are stored in a separate file, with the file name based on the year and zone number. Try to open it.
 
                     char bFirstRow = true;
 
@@ -418,10 +574,10 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
                             sscanf_P( tmp_buf, PSTR("%u,%u,%u:%u,%i,%i,%i,%i"),
                                                             &nmonth, &nday, &nhour, &nminute, &nduration, &nschedule, &nsadj, &nwunderground);
 
-                            if( nday > day(end) )    // check for the end date
+                            if( (nmonth > month(end)) || ((nmonth == month(end)) && (nday > day(end))) )    // check for the end date
                                          break;
 
-                            if( nday >= day(start) ){        // the record is within required range. m is the month, nday is the day of the month, xzone is the zone we are currently emitting
+                            if( nday >= day(start) ){        // the record is within required range. nmonth is the month, nday is the day of the month, xzone is the zone we are currently emitting
 
 // we have something to output.
 
@@ -449,7 +605,7 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
         }   // for( int xzone = 1; xzone <= xmaxzone; xzone++ )
 
         if( curr_zone != 255)
-                     fprintf_P(stream_file, PSTR("\n\t\t\t\t\t ] \n\t\t\t\t } \n"));    // JSON zone footer
+                     fprintf_P(stream_file, PSTR("\n\t\t\t\t\t ] \n\t\t\t\t } \n"));    // close the last zone if we emitted
 
         return true;
 }

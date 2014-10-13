@@ -11,6 +11,7 @@
 #include "Event.h"
 #include "port.h"
 #include <stdlib.h>
+#include "sensors.h"
 #ifdef ARDUINO
 #include "tftp.h"
 static tftp tftpServer;
@@ -19,15 +20,35 @@ static tftp tftpServer;
 #include <unistd.h>
 #endif
 
+// Core modules
+
 #ifdef LOGGING
 Logging sdlog;
 #endif
 static web webServer;
 nntp nntpTimeServer;
 runStateClass runState;
+Sensors sensorsModule;
 
 // A bitfield that defines which zones are currently on.
 int ZoneState = 0;
+
+// maximum ulong value
+#define MAX_ULONG       4294967295
+
+// Helper inline function
+//
+// Subtract two millis values and return delta
+// Takes into account counter rollover
+//
+inline unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis)
+{
+  if( new_millis > old_millis ) return (new_millis-old_millis); // main case - new is bigger than old
+
+  unsigned long delta = MAX_ULONG - old_millis; delta += new_millis;    // do math in two steps to ensure no overflow
+  return delta;
+}
+
 
 runStateClass::runStateClass() : m_bSchedule(false), m_bManual(false), m_iSchedule(-1), m_zone(-1), m_endTime(0), m_eventTime(0)
 {
@@ -416,6 +437,8 @@ void mainLoop()
                         ResetEEPROM();
                 io_setup();
 
+                sensorsModule.begin();  // start sensors module
+                
                 TurnOffZones();
                 ClearEvents();
 
@@ -439,21 +462,36 @@ void mainLoop()
 
         }
 
-        // Check to see if we need to set the clock and do so if necessary.
-        nntpTimeServer.checkTime();
+// Optimization - following code needs to be executed regularly but high frequency is not required.
+// To preserve system resources let's make it execute once per second.
 
-        const time_t timeNow = nntpTimeServer.LocalNow();
-        // One shot at midnight
-        if ((hour(timeNow) == 0) && !bDoneMidnightReset)
-        {
-                trace(F("Reloading Midnight\n"));
-                bDoneMidnightReset = true;
-                // TODO:  outstanding midnight events.  See other TODO for how.
-                ReloadEvents(true);
-        }
-        else if (hour(timeNow) != 0)
-                bDoneMidnightReset = false;
+       static unsigned long  old_millis = 0;
+       unsigned long  new_millis = millis();    // Note: we are using built-in Arduino millis() function instead of now() or time-zone adjusted LocalNow(), because it is a lot faster
+                                                               // and for detecting second change it does not make any difference.
 
+       if( subt_millis(new_millis, old_millis) >= 1000 ){   
+
+             old_millis = new_millis;
+
+             // Check to see if we need to set the clock and do so if necessary.
+             nntpTimeServer.checkTime();
+
+             const time_t timeNow = nntpTimeServer.LocalNow();
+             // One shot at midnight
+             if ((hour(timeNow) == 0) && !bDoneMidnightReset)
+             {
+                     trace(F("Reloading Midnight\n"));
+                     bDoneMidnightReset = true;
+                     // TODO:  outstanding midnight events.  See other TODO for how.
+                     ReloadEvents(true);
+             }
+             else if (hour(timeNow) != 0)
+                     bDoneMidnightReset = false;
+
+             sensorsModule.loop();  // read and process sensors. Note: sensors module has its own scheduler.
+                     
+        }  // one-second block
+        
         //  See if any web clients have connected
         webServer.ProcessWebClients();
 
@@ -471,3 +509,4 @@ void mainLoop()
         // latch any output modifications
         io_latch();
 }
+

@@ -1,0 +1,96 @@
+//
+// Emit sensor log file as JSON for a single sensor or zone
+//
+// Returns <=0 if nothing was emitted (for any reasons), or the number of records emitted
+//
+// Note: current implementation will not handle multi-year requests
+//
+int Logging::EmitSLogJson_single(FILE* stream_file, char log_type, int id, time_t start, time_t end, GROUPING grouping, bool close_prev)
+{
+        // temp buffer for log strings processing
+        char tmp_buf[MAX_LOG_RECORD_SIZE];
+        SdFile  lfile;
+
+        if (start == 0)
+                start = nntpTimeServer.LocalNow();
+        end = max(start,end) + 24*3600;  // add 1 day to end time.
+
+        switch( log_type ){
+          
+            case LOG_TYPE_WATERING:
+                     return 0; // not implemented yet          
+                     break; 
+          
+            case LOG_TYPE_TEMPERATURE:
+                     sprintf_P(tmp_buf, PSTR(TEMPERATURE_LOG_FNAME_FORMAT), year(start), sensor_id );           
+                     break; 
+          
+            case LOG_TYPE_HUMIDITY:
+                     sprintf_P(tmp_buf, PSTR(HUMIDITY_LOG_FNAME_FORMAT), year(start), sensor_id );           
+                     break; 
+          
+            case LOG_TYPE_PRESSURE:
+                     sprintf_P(tmp_buf, PSTR(PRESSURE_LOG_FNAME_FORMAT), year(start), sensor_id );
+                     break; 
+          
+            default:
+                     return false;    // log type not recognized
+                     break;                     
+        }
+
+        if( !lfile.open(tmp_buf, O_READ) ){    // we are trying to open existing log file for reading
+        
+                 trace(F("EmitLogJson - failed to open log file: %s"), tmp_buf);
+                 return false;
+        }
+  
+        char bFirstRow = true;
+        char bJustStarted = true;
+
+        lfile.fgets(tmp_buf, MAX_LOG_RECORD_SIZE-1);  // skip first line in the file - column headers
+
+// OK, we opened required log file. Iterate over records, filtering out necessary dates range
+                  
+        while( lfile.available() ){
+
+                  int  nmonth = 0, nday = 0, nhour = 0, nminute = 0, nschedule = 0;
+                  int  nduration = 0,  nsadj = 0, nwunderground = 0;
+
+                  int bytes = lfile.fgets(tmp_buf, MAX_WATERING_LOG_RECORD_SIZE);
+                  if (bytes <= 0)
+                              break;
+
+                  // Parse the string into fields. First field (up to two digits) is the day of the month
+
+                  sscanf_P( tmp_buf, PSTR("%u,%u,%u:%u,%i,%i,%i,%i"),
+                                                  &nmonth, &nday, &nhour, &nminute, &nduration, &nschedule, &nsadj, &nwunderground);
+
+                  if( (nmonth > month(end)) || ((nmonth == month(end)) && (nday > day(end))) )    // check for the end date
+                                break;
+
+                  if( nday >= day(start) ){        // the record is within required range. nmonth is the month, nday is the day of the month, xzone is the zone we are currently emitting
+
+                       // we have something to output.
+
+                       if( bJustStarted ){
+                         
+                                 if( close_prev )                                      
+                                         fprintf_P(stream_file, PSTR("\n\t\t\t\t\t]\n\t\t\t\t},\n"));   // we need to close previous section
+
+                                 fprintf_P(stream_file, PSTR("\n\t\t\t\t { \n\t\t\t\t name: 'ID%i',\n\t\t\t\t data: ["), id);   // JSON time series header
+                                 bJustStarted = false;
+                                 bFirstRow = true;
+                       }
+
+                       tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = nhour;  tm.Minute = nminute;  tm.Second = 0;
+                            
+                       fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t { \"date\":%lu, \"duration\":%i, \"schedule\":%i, \"seasonal\":%i, \"wunderground\":%i}"),
+                                                          bFirstRow ? "":",",
+                                                          makeTime(tm), nduration, nschedule, nsadj, nwunderground );
+
+                       bFirstRow = false;
+                  }
+        }   // while
+        lfile.close();
+  
+}
