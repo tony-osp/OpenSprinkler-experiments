@@ -623,7 +623,7 @@ void OSLocalUI::lcd_print_ip(const byte *ip) {
 
  // Index of today's weekday (Monday is 0)
 byte weekday_today() {
-  return ((byte)weekday()+5)%7; // Time::weekday() assumes Sunday is 1
+  return ((byte)weekday(nntpTimeServer.LocalNow())+5)%7; // Time::weekday() assumes Sunday is 1
 }
 
 // Local wrapper for manual valve control.
