@@ -573,7 +573,7 @@ static bool RunSchedules(const KVPairs & key_value_pairs)
 		const char * value = key_value_pairs.values[i];
 		if (strcmp_P(key, PSTR("system")) == 0)
 		{
-			SetRunSchedules(strcmp(value, "on") == 0);
+			SetRunSchedules(strcmp_P(value, PSTR("on")) == 0);
 		}
 	}
 	return true;
@@ -897,138 +897,155 @@ void web::ProcessWebClients()
 #else
 		FILE * pFile = fdopen(client.GetSocket(), "w");
 #endif
-		freeMemory();
-		trace(F("Got a client\n"));
-		//ShowSockStatus();
-		KVPairs key_value_pairs;
-		char sPage[35];
+		 freeMemory();
+		 trace(F("Got a client\n"));
+		 //ShowSockStatus();
+		 KVPairs key_value_pairs;
+		 char sPage[35];
 
-		if (!ParseHTTPHeader(client, &key_value_pairs, sPage, sizeof(sPage)))
-		{
+		 if (!ParseHTTPHeader(client, &key_value_pairs, sPage, sizeof(sPage)))
+		 {
 			trace(F("ERROR!\n"));
 			ServeError(pFile);
-		}
-		else
-		{
+		 }
+		 else
+		 {
 
 			trace(F("Page:%s\n"), sPage);
 			//ShowSockStatus();
 
-			if (strcmp_P(sPage, PSTR("bin/setSched")) == 0)
-			{
-				if (SetSchedule(key_value_pairs))
-				{
-					if (GetRunSchedules())
-						ReloadEvents();
-					ServeHeader(pFile, 200, PSTR("OK"), false);
-				}
-				else
-					ServeError(pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("bin/setZones")) == 0)
-			{
-				if (SetZones(key_value_pairs))
-				{
-					ReloadEvents();
-					ServeHeader(pFile, 200, PSTR("OK"), false);
-				}
-				else
-					ServeError(pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("bin/delSched")) == 0)
-			{
-				if (DeleteSchedule(key_value_pairs))
-				{
-					if (GetRunSchedules())
-						ReloadEvents();
-					ServeHeader(pFile, 200, PSTR("OK"), false);
-				}
-				else
-					ServeError(pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("bin/setQSched")) == 0)
-			{
-				if (SetQSched(key_value_pairs))
-				{
-					ServeHeader(pFile, 200, PSTR("OK"), false);
-				}
-				else
-					ServeError(pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("bin/settings")) == 0)
-			{
-				if (SetSettings(key_value_pairs))
-				{
-					ReloadEvents();
-					ServeHeader(pFile, 200, PSTR("OK"), false);
-				}
-				else
-					ServeError(pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("bin/manual")) == 0)
-			{
-				if (ManualZone(key_value_pairs))
-				{
-					ServeHeader(pFile, 200, PSTR("OK"), false);
-				}
-				else
-					ServeError(pFile);
-			}
-			else if (strcmp(sPage, PSTR("bin/run")) == 0)
-			{
-				if (RunSchedules(key_value_pairs))
-				{
-					ReloadEvents();
-					ServeHeader(pFile, 200, PSTR("OK"), false);
-				}
-				else
-					ServeError(pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("bin/factory")) == 0)
-			{
-				ResetEEPROM();
-				ReloadEvents();
-				ServeHeader(pFile, 200, PSTR("OK"), false);
-			}
-			else if (strcmp_P(sPage, PSTR("bin/reset")) == 0)
-			{
-				ServeHeader(pFile, 200, PSTR("OK"), false);
-				bReset = true;
-			}
-			else if (strcmp_P(sPage, PSTR("json/schedules")) == 0)
-			{
-				JSONSchedules(key_value_pairs, pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("json/zones")) == 0)
-			{
-				JSONZones(key_value_pairs, pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("json/settings")) == 0)
-			{
-				JSONSettings(key_value_pairs, pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("json/state")) == 0)
-			{
-				JSONState(key_value_pairs, pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("json/schedule")) == 0)
-			{
-				JSONSchedule(key_value_pairs, pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("json/wcheck")) == 0)
-			{
-				JSONwCheck(key_value_pairs, pFile);
-			}
+                        if( strncmp_P(sPage, PSTR("bin/"), 4) == 0 )       // We do the check in two phases. 
+                                                                                                      // First we check that the URL starts with "bin/" to identify the block of bin requests, 
+                                                                                                      // and then each request in the block checks the rest of the URL to determine specific request
+                                                                                                      //
+                                                                                                      // This optimization speeds up request decoding, allowing to reduce the number of strcmp() each request goes through
+                                                                                                      //
+                        {
+                             char *xP4 = sPage + 4;
+
+     			     if (strcmp_P(xP4, PSTR("setSched")) == 0)
+			     {
+				     if (SetSchedule(key_value_pairs))
+				     {
+					     if (GetRunSchedules())
+						     ReloadEvents();
+					     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     }
+				     else
+					     ServeError(pFile);
+			     }
+			     else if (strcmp_P(xP4, PSTR("setZones")) == 0)
+			     {
+				     if (SetZones(key_value_pairs))
+				     {
+					     ReloadEvents();
+					     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     }
+				     else
+					     ServeError(pFile);
+			     }
+			     else if (strcmp_P(xP4, PSTR("delSched")) == 0)
+  			     {
+				     if (DeleteSchedule(key_value_pairs))
+				     {
+					     if (GetRunSchedules())
+						     ReloadEvents();
+					     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     }
+				     else
+					     ServeError(pFile);
+			     }
+			     else if (strcmp_P(xP4, PSTR("setQSched")) == 0)
+			     {
+				     if (SetQSched(key_value_pairs))
+				     {
+					     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     }
+				     else
+					     ServeError(pFile);
+			     }
+			     else if (strcmp_P(xP4, PSTR("settings")) == 0)
+			     {
+				     if (SetSettings(key_value_pairs))
+				     {
+					     ReloadEvents();
+					     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     }
+				     else
+					     ServeError(pFile);
+			     }
+			     else if (strcmp_P(xP4, PSTR("manual")) == 0)
+			     {
+				     if (ManualZone(key_value_pairs))
+				     {
+					     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     }
+				     else
+					     ServeError(pFile);
+			     }
+			     else if (strcmp_P(xP4, PSTR("run")) == 0)
+			     {
+				     if (RunSchedules(key_value_pairs))
+				     {
+					     ReloadEvents();
+					     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     }
+				     else
+					     ServeError(pFile);
+			     }
+			     else if (strcmp_P(xP4, PSTR("factory")) == 0)
+			     {
+				     ResetEEPROM();
+				     ReloadEvents();
+				     ServeHeader(pFile, 200, PSTR("OK"), false);
+			     }
+			     else if (strcmp_P(xP4, PSTR("reset")) == 0)
+			     {
+				     ServeHeader(pFile, 200, PSTR("OK"), false);
+				     bReset = true;
+			     }
+                        }
+                        else if( strncmp_P(sPage, PSTR("json/"), 5) == 0 )      // We do the check in two phases. 
+                                                                                                              // First we check that the URL starts with "json/" to identify the block of json requests, 
+                                                                                                              // and then each request in the block checks the rest of the URL to determine specific request
+                        {
+                             char *xP5 = sPage + 5;
+                             
+			     if (strcmp_P(xP5, PSTR("schedules")) == 0)
+			     {
+				     JSONSchedules(key_value_pairs, pFile);
+			     }
+			     else if (strcmp_P(xP5, PSTR("zones")) == 0)
+			     {
+				     JSONZones(key_value_pairs, pFile);
+			     }
+			     else if (strcmp_P(xP5, PSTR("settings")) == 0)
+			     {
+				     JSONSettings(key_value_pairs, pFile);
+			     }
+			     else if (strcmp_P(xP5, PSTR("state")) == 0)
+			     {
+				     JSONState(key_value_pairs, pFile);
+			     }
+			     else if (strcmp_P(xP5, PSTR("schedule")) == 0)
+			     {
+				     JSONSchedule(key_value_pairs, pFile);
+			     }
+			     else if (strcmp_P(xP5, PSTR("wcheck")) == 0)
+			     {
+				     JSONwCheck(key_value_pairs, pFile);
+			     }
 #ifdef LOGGING
-			else if (strcmp_P(sPage, PSTR("json/logs")) == 0)
-			{
-				JSONLogs(key_value_pairs, pFile);
-			}
-			else if (strcmp_P(sPage, PSTR("json/tlogs")) == 0)
-			{
-				JSONtLogs(key_value_pairs, pFile);
-			}
+			     else if (strcmp_P(xP5, PSTR("logs")) == 0)
+			     {
+			 	      JSONLogs(key_value_pairs, pFile);
+			     }
+			     else if (strcmp_P(xP5, PSTR("tlogs")) == 0)
+			     {
+				     JSONtLogs(key_value_pairs, pFile);
+			     }
 #endif //LOGGING
+                        }
 			else if (strcmp_P(sPage, PSTR("ShowSched")) == 0)
 			{
 				freeMemory();
