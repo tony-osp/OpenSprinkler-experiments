@@ -137,26 +137,26 @@ bool SetSchedule(const KVPairs & key_value_pairs)
         {
                 const char * key = key_value_pairs.keys[i];
                 const char * value = key_value_pairs.values[i];
-                if (strcmp(key, "id") == 0)
+                if (strcmp_P(key, PSTR("id")) == 0)
                 {
                         sched_num = atoi(value);
                 }
-                else if (strcmp(key, "type") == 0)
-                        sched.SetInterval(strcmp(value, "on") != 0);
-                else if (strcmp(key, "enable") == 0)
-                        sched.SetEnabled(strcmp(value, "on") == 0);
-                else if (strcmp(key, "wadj") == 0)
-                        sched.SetWAdj(strcmp(value, "on") == 0);
-                else if (strcmp(key, "name") == 0)
+                else if (strcmp_P(key, PSTR("type")) == 0)
+                        sched.SetInterval(strcmp_P(value, PSTR("on")) != 0);
+                else if (strcmp_P(key, PSTR("enable")) == 0)
+                        sched.SetEnabled(strcmp_P(value, PSTR("on")) == 0);
+                else if (strcmp_P(key, PSTR("wadj")) == 0)
+                        sched.SetWAdj(strcmp_P(value, PSTR("on")) == 0);
+                else if (strcmp_P(key, PSTR("name")) == 0)
                         strncpy(sched.name, value, sizeof(sched.name));
-                else if (strcmp(key, "interval") == 0)
+                else if (strcmp_P(key, PSTR("interval")) == 0)
                 {
                         if (sched.IsInterval())
                                 sched.interval = atoi(value);
                 }
                 else if ((key[0] == 'd') && (key[2] == 0) && ((key[1] >= '1') && (key[1] <= '7')) && !(sched.IsInterval()))
                 {
-                        if (strcmp(value, "on") == 0)
+                        if (strcmp_P(value, PSTR("on")) == 0)
                                 sched.day = sched.day | 0x01 << (key[1] - '1');
                         else
                                 sched.day = sched.day & ~(0x01 << (key[1] - '1'));
@@ -181,7 +181,7 @@ bool SetSchedule(const KVPairs & key_value_pairs)
                 }
                 else if ((key[0] == 'e') && (key[2] == 0) && ((key[1] >= '1') && (key[1] <= '4')))
                 {
-                        if (strcmp(value, "on") == 0)
+                        if (strcmp_P(value, PSTR("on")) == 0)
                                 time_enable[key[1] - '1'] = true;
                         else
                                 time_enable[key[1] - '1'] = false;
@@ -232,7 +232,7 @@ bool DeleteSchedule(const KVPairs & key_value_pairs)
         {
                 const char * key = key_value_pairs.keys[i];
                 const char * value = key_value_pairs.values[i];
-                if (strcmp(key, "id") == 0)
+                if (strcmp_P(key, PSTR("id")) == 0)
                 {
                         sched_num = atoi(value);
                 }
@@ -270,14 +270,14 @@ bool SetZones(const KVPairs & key_value_pairs)
                                 strncpy(zones[zone_num].name, value, sizeof(zones[zone_num].name));
                         else if ((key[2] == 'e') && (key[3] == 0))
                         {
-                                if (strcmp(value, "on") == 0)
+                                if (strcmp_P(value, PSTR("on")) == 0)
                                         zones[zone_num].bEnabled = true;
                                 else
                                         zones[zone_num].bEnabled = false;
                         }
                         else if ((key[2] == 'p') && (key[3] == 0))
                         {
-                                if (strcmp(value, "on") == 0)
+                                if (strcmp_P(value, PSTR("on")) == 0)
                                         zones[zone_num].bPump = true;
                                 else
                                         zones[zone_num].bPump = false;
@@ -295,57 +295,57 @@ bool SetSettings(const KVPairs & key_value_pairs)
         {
                 const char * key = key_value_pairs.keys[i];
                 const char * value = key_value_pairs.values[i];
-                if (strcmp(key, "ip") == 0)
+                if (strcmp_P(key, PSTR("ip")) == 0)
                 {
                         SetIP(decodeIP(value));
                 }
-                else if (strcmp(key, "netmask") == 0)
+                else if (strcmp_P(key, PSTR("netmask")) == 0)
                 {
                         SetNetmask(decodeIP(value));
                 }
-                else if (strcmp(key, "gateway") == 0)
+                else if (strcmp_P(key, PSTR("gateway")) == 0)
                 {
                         SetGateway(decodeIP(value));
                 }
-                else if (strcmp(key, "wuip") == 0)
+                else if (strcmp_P(key, PSTR("wuip")) == 0)
                 {
                         SetWUIP(decodeIP(value));
                 }
-                else if (strcmp(key, "apikey") == 0)
+                else if (strcmp_P(key, PSTR("apikey")) == 0)
                 {
                         SetApiKey(value);
                 }
-                else if (strcmp(key, "zip") == 0)
+                else if (strcmp_P(key, PSTR("zip")) == 0)
                 {
                         SetZip(strtoul(value, 0, 10));
                 }
-                else if (strcmp(key, "NTPip") == 0)
+                else if (strcmp_P(key, PSTR("NTPip")) == 0)
                 {
                         SetNTPIP(decodeIP(value));
                 }
-                else if (strcmp(key, "NTPoffset") == 0)
+                else if (strcmp_P(key, PSTR("NTPoffset")) == 0)
                 {
                         SetNTPOffset(atoi(value));
                 }
-                else if (strcmp(key, "ot") == 0)
+                else if (strcmp_P(key, PSTR("ot")) == 0)
                 {
                         SetOT((EOT)atoi(value));
                 }
-                else if (strcmp(key, "webport") == 0)
+                else if (strcmp_P(key, PSTR("webport")) == 0)
                 {
                         SetWebPort(atoi(value));
                 }
-                else if (strcmp(key, "sadj") == 0)
+                else if (strcmp_P(key, PSTR("sadj")) == 0)
                 {
                         SetSeasonalAdjust(atoi(value));
                 }
-                else if (strcmp(key, "pws") == 0)
+                else if (strcmp_P(key, PSTR("pws")) == 0)
                 {
                         SetPWS(value);
                 }
-                else if (strcmp(key, "wutype") == 0)
+                else if (strcmp_P(key, PSTR("wutype")) == 0)
                 {
-                        SetUsePWS(strcmp(value, "pws") == 0);
+                        SetUsePWS(strcmp_P(value, PSTR("pws")) == 0);
                 }
 
         }
