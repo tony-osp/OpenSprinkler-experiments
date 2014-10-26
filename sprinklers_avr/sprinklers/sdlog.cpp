@@ -480,41 +480,44 @@ int Logging::getZoneBins( int zone, time_t start, time_t end, long int bin_data[
                     if( (nmonth > nmend) || ((nmonth == nmend) && (nday > ndayend)) )    // check for the end date
                                  break;
 
-                    switch (grouping)
-                    {
-                         case HOURLY:
-                         if( nhour <= 24 ){    // basic protection to ensure corrupted data will not crash the system
-                     
-                              bin_data[nhour] += (long int)nduration;
-                              bin_counter[nhour]++;
-                         }
-                         break;
+                    if( (nmonth > month(start)) || ((nmonth == month(start)) && (nday >= day(start)) )  ){        // the record is within required range. nmonth is the month, nday is the day of the month, xzone is the zone we are currently emitting
 
-                         case DAILY:
+                         switch (grouping)
                          {
-                                  tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = nhour;  tm.Minute = nminute;  tm.Second = 0; 
-                                  unsigned int  dow=weekday(makeTime(tm));
-                                  
-                                  if( dow <= 7 ){    // basic protection to ensure corrupted data will not crash the system
+                              case HOURLY:
+                              if( nhour <= 24 ){    // basic protection to ensure corrupted data will not crash the system
                      
-                                            bin_data[dow] += (long int)nduration;
-                                            bin_counter[dow]++;
-                                  }
-                         }
-                         break;
+                                   bin_data[nhour] += (long int)nduration;
+                                   bin_counter[nhour]++;
+                              }
+                              break;
 
-                         case MONTHLY:
-                         if( nmonth <= 12 ){    // basic protection to ensure corrupted data will not crash the system
+                              case DAILY:
+                              {
+                                       tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = nhour;  tm.Minute = nminute;  tm.Second = 0; 
+                                       unsigned int  dow=weekday(makeTime(tm));
+                                       
+                                       if( dow <= 7 ){    // basic protection to ensure corrupted data will not crash the system
                      
-                              bin_data[nmonth] += (long int)nduration;
-                              bin_counter[nmonth]++;
-                         }
-                         break;
+                                                 bin_data[dow] += (long int)nduration;
+                                                 bin_counter[dow]++;
+                                       }
+                              }
+                              break;
 
-                         default:
-                                 return -2;  // unsupported grouping                        
-                         break;
-                    }  // switch(grouping)
+                              case MONTHLY:
+                              if( nmonth <= 12 ){    // basic protection to ensure corrupted data will not crash the system
+                     
+                                   bin_data[nmonth] += (long int)nduration;
+                                   bin_counter[nmonth]++;
+                              }
+                              break;
+
+                              default:
+                                      return -2;  // unsupported grouping                        
+                              break;
+                         }  // switch(grouping)
+                    }      
         } // while
         
         lfile.close();
@@ -542,9 +545,17 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
         if (start == 0)
                 start = nntpTimeServer.LocalNow();
 
-        int    nyear=year(start);
+        unsigned int    nyear=year(start);
 
         end = max(start,end) + 24*3600;  // add 1 day to end time.
+
+        unsigned int  nmend = month(end);
+        unsigned int  ndayend = day(end);
+
+        if( year(end) != year(start) ){     // currently we cannot handle queries that span multiple years. Truncate the query to the year end.
+
+             nmend = 12;    ndayend = 31;
+        }
 
         int curr_zone = 255;
         for( int xzone = 1; xzone <= NUM_ZONES; xzone++ ){  // iterate over zones
@@ -555,6 +566,10 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
                 if( lfile.open(tmp_buf, O_READ) ){  // logs for each zone are stored in a separate file, with the file name based on the year and zone number. Try to open it.
 
                     char bFirstRow = true;
+                    
+//                    if(xzone==1){
+//                         trace(F("***Reading zone=1, year=%u, month end=%u, day end=%u***\n"), nyear, nmend, ndayend);
+//                    }
 
                      lfile.fgets(tmp_buf, MAX_WATERING_LOG_RECORD_SIZE);  // skip first line in the file - column headers
 
@@ -574,10 +589,15 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
                             sscanf_P( tmp_buf, PSTR("%u,%u,%u:%u,%i,%i,%i,%i"),
                                                             &nmonth, &nday, &nhour, &nminute, &nduration, &nschedule, &nsadj, &nwunderground);
 
-                            if( (nmonth > month(end)) || ((nmonth == month(end)) && (nday > day(end))) )    // check for the end date
+                            if( (nmonth > nmend) || ((nmonth == nmend) && (nday > ndayend)) )    // check for the end date
                                          break;
 
-                            if( nday >= day(start) ){        // the record is within required range. nmonth is the month, nday is the day of the month, xzone is the zone we are currently emitting
+                            if( (nmonth > month(start)) || ((nmonth == month(start)) && (nday >= day(start)) )  ){        // the record is within required range. nmonth is the month, nday is the day of the month, xzone is the zone we are currently emitting
+
+//                    if(xzone==1){
+//                      
+//                        trace(F("Found suitable string: %s\n"), tmp_buf);
+//                    }
 
 // we have something to output.
 
