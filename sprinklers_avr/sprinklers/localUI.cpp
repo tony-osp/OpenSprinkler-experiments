@@ -91,24 +91,6 @@ char* days_str[7] = {
   str_day6
 };
 
-// maximum ulong value
-#define MAX_ULONG       4294967295
-
-// Helper inline function
-//
-// Subtract two millis values and return delta
-// Takes into account counter rollover
-//
-inline unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis)
-{
-  if( new_millis > old_millis ) return (new_millis-old_millis); // main case - new is bigger than old
-
-// new millis is smaller than old millis which means - overflow. Calculate correct value
-
-  unsigned long delta = MAX_ULONG - old_millis; delta += new_millis;    // do math in two steps to ensure no overflow
-  return delta;
-}
-
 
 // initialization. Intended to be called from setup()
 //
@@ -275,7 +257,7 @@ byte OSLocalUI::callHandler(byte needs_refresh)
   unsigned long  new_millis = millis();    // Note: we are using built-in Arduino millis() function instead of now() or time-zone adjusted LocalNow(), because it is a lot faster
                                                              // and for detecting second change it does not make any difference.
 
-  if( (subt_millis(new_millis, old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second, OR if explicit refresh is required
+  if( ((new_millis - old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second, OR if explicit refresh is required
 
     old_millis = new_millis;
     lcd_print_time(0);       // print time
@@ -351,7 +333,7 @@ byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
                 return  true;    // exit. Actual minutes display will happen on the next loop();
          }
 
-     if( (subt_millis(new_millis, old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second (for blinking), OR if explicit refresh is required
+     if( ((new_millis - old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second (for blinking), OR if explicit refresh is required
 
 //     if( (last_time != curr_time) || (forceRefresh != 0) ) {  // update UI once a second (for blinking), OR if explicit refresh is required
 
@@ -401,7 +383,7 @@ byte OSLocalUI::modeHandler_Manual(byte forceRefresh)
                 return true;
      }
 // now screen update and blinking cursor
-     if( (subt_millis(new_millis, old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second (for blinking), OR if explicit refresh is required
+     if( ((new_millis - old_millis) >= 1000) || (forceRefresh != 0) ){   // update UI once a second (for blinking), OR if explicit refresh is required
 //     if( (last_time != curr_time) || (forceRefresh !=0) ) {  // update UI once a second (for blinking), OR if explicit refresh is required
 
            old_millis = new_millis;

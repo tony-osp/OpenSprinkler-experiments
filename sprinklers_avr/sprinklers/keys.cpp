@@ -35,22 +35,6 @@ limitations under the License.
 // local forward declarations
 
 
-// maximum ulong value
-#define MAX_ULONG       4294967295
-
-// Subtract two millis values and return delta
-// Takes into account counter rollover
-//
-inline unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis)
-{
-  if( new_millis > old_millis ) return (new_millis-old_millis); // main case - new is bigger than old
-
-// new millis is smaller than old millis which means - overflow. Calculate correct value
-
-  unsigned long delta = MAX_ULONG - old_millis; delta += new_millis;    // do math in two steps to ensure no overflow
-  return delta;
-}
-
 #ifdef ANALOG_KEY_INPUT
 
 // Analogue buttons version
@@ -136,7 +120,7 @@ byte get_button_async(byte mode)
   }
   else if( state == 1 )         // we already had prior key press and are waiting for debounce
   {
-    if( subt_millis(millis(), old_millis) < KEY_DEBOUNCE_DELAY ) return BUTTON_NONE;    // we are waiting for KEY_DEBOUNCE_DELAY (which is normally 50ms)
+    if( (millis() - old_millis) < KEY_DEBOUNCE_DELAY ) return BUTTON_NONE;    // we are waiting for KEY_DEBOUNCE_DELAY (which is normally 50ms)
 // delay expired, check new value
 
     key = get_keys_now(); // read key and convert it into standardized key values. Note: get_keys() returns immediate key state
@@ -170,7 +154,7 @@ byte get_button_async(byte mode)
     }
     else if( mode == 1 ){    // autorepeat mode
 
-       if( subt_millis(millis(), old_millis) < KEY_HOLD_DELAY ) return BUTTON_NONE;     // no auto-repeat until HOLD timeout expires
+       if( (millis() - old_millis) < KEY_HOLD_DELAY ) return BUTTON_NONE;     // no auto-repeat until HOLD timeout expires
 
 // Auto-repeat
        if( autorepeat_sent == 0 ){      // auto-repeat not sent yet, setup things
@@ -183,7 +167,7 @@ byte get_button_async(byte mode)
        }
        else {   // auto-repeat in progress
 
-          if( subt_millis(millis(), autorepeat_millis) > KEY_REPEAT_INTERVAL ) autorepeat_sent = 0;  // trigger new autorepeat key on the next poll
+          if( (millis() - autorepeat_millis) > KEY_REPEAT_INTERVAL ) autorepeat_sent = 0;  // trigger new autorepeat key on the next poll
 
           return BUTTON_NONE;
        }

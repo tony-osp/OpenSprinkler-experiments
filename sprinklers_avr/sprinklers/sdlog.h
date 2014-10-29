@@ -46,23 +46,23 @@ limitations under the License.
 #define WFLOW_LOG_DIR			"/wflow.log"
 #define WFLOW_LOG_FNAME_FORMAT "/wflow.log/wfl-%4.4u.%3.3u"
 
-// Temperature data directory and file name format (tem-yyyy.nnn)
+// Temperature data directory and file name format (temMM-YY.nnn)
 //#define TEMPERATURE_LOG_DIR		 	 "/tempr.log"
 //#define TEMPERATURE_LOG_FNAME_FORMAT "/tempr.log/tem-%4.4u.%3.3u"
 // temporary put temperature logs into /logs directory
 #define TEMPERATURE_LOG_DIR		 	 "/logs"
-#define TEMPERATURE_LOG_FNAME_FORMAT "/logs/tem-%4.4u.%3.3u"
+#define TEMPERATURE_LOG_FNAME_FORMAT "/logs/tem%2.2u-%2.2u.%3.3u"
 
-// Humidity data directory and file name format (hum-yyyy.nnn)
+// Humidity data directory and file name format (humMM-YY.nnn)
 #define HUMIDITY_LOG_DIR		  "/humid.log"
-#define HUMIDITY_LOG_FNAME_FORMAT "/humid.log/hum-%4.4u.%3.3u"
+#define HUMIDITY_LOG_FNAME_FORMAT "/humid.log/hum%2.2u-%2.2u.%3.3u"
 
-// Atmospheric pressure data directory and file name format (pre-yyyy.nnn)
+// Atmospheric pressure data directory and file name format (preMM-YY.nnn)
 //#define PRESSURE_LOG_DIR		  "/pressure.log"
 //#define PRESSURE_LOG_FNAME_FORMAT "/pressure.log/pre-%4.4u.%3.3u"
 // temporary put pressure files in system logs directory
 #define PRESSURE_LOG_DIR		  "/logs"
-#define PRESSURE_LOG_FNAME_FORMAT "/logs/pre-%4.4u.%3.3u"
+#define PRESSURE_LOG_FNAME_FORMAT "/logs/pre%2.2u-%2.2u.%3.3u"
 
 
 //
@@ -80,6 +80,14 @@ limitations under the License.
 #define SENSOR_TYPE_PRESSURE            2
 #define SENSOR_TYPE_HUMIDITY              3
 #define SENSOR_TYPE_WATERFLOW        4
+
+//
+// Summarization codes
+//
+#define LOG_SUMMARY_NONE         0
+#define LOG_SUMMARY_HOUR         1
+#define LOG_SUMMARY_DAY            2
+#define LOG_SUMMARY_MONTH      3
 
 
 //
@@ -115,6 +123,8 @@ public:
 
         // Sensors logging. It covers all types of basic sensors (e.g. temperature, pressure etc) that provide momentarily (immediate) readings
         bool LogSensorReading(char sensor_type, int sensor_id, int sensor_reading);
+
+	bool EmitSensorLog(FILE* stream_file, time_t sdate, time_t edate, char sensor_type, int sensor_id, char summary_type);
 
         // add event to the system log with the string str
         byte syslog_str(char evt_type, char *str);

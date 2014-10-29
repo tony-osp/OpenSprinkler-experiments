@@ -308,19 +308,19 @@ bool Logging::LogSensorReading(char sensor_type, int sensor_id, int sensor_readi
       
            case  SENSOR_TYPE_TEMPERATURE:
           
-                     sprintf_P(tmp_buf, PSTR(TEMPERATURE_LOG_FNAME_FORMAT), year(t), sensor_id );
+                     sprintf_P(tmp_buf, PSTR(TEMPERATURE_LOG_FNAME_FORMAT), month(t), year(t)%100, sensor_id );
                      sensorName = PSTR("Temperature(F)");
                      break; 
       
            case  SENSOR_TYPE_PRESSURE:
 
-                     sprintf_P(tmp_buf, PSTR(PRESSURE_LOG_FNAME_FORMAT), year(t), sensor_id );
+                     sprintf_P(tmp_buf, PSTR(PRESSURE_LOG_FNAME_FORMAT), month(t), year(t)%100, sensor_id );
                      sensorName = PSTR("AirPressure");
                      break; 
       
            case  SENSOR_TYPE_HUMIDITY:
           
-                     sprintf_P(tmp_buf, PSTR(HUMIDITY_LOG_FNAME_FORMAT), year(t), sensor_id );
+                     sprintf_P(tmp_buf, PSTR(HUMIDITY_LOG_FNAME_FORMAT), month(t), year(t)%100, sensor_id );
                      sensorName = PSTR("Humidity");
                      break; 
       
@@ -338,12 +338,12 @@ bool Logging::LogSensorReading(char sensor_type, int sensor_id, int sensor_readi
                trace(F("Cannot open sensor  log file (%s)\n"), tmp_buf);    // file create failed, return an error.
                return false;    // failed to open/create file
          }
-         wfile.print(F("Month,Day,Time,"));  sprintf_P(tmp_buf, PSTR("%S"), sensorName);  wfile.println(tmp_buf);
+         wfile.print(F("Day,Time,"));  sprintf_P(tmp_buf, PSTR("%S"), sensorName);  wfile.println(tmp_buf);
          
 //         trace(F("creating new log file for sensor:%S"), sensorName);
       }
 
-      sprintf_P(tmp_buf, PSTR("%u,%u,%u:%u,%d"), month(t), day(t), hour(t), minute(t), sensor_reading);
+      sprintf_P(tmp_buf, PSTR("%u,%u:%u,%d"), day(t), hour(t), minute(t), sensor_reading);
       wfile.println(tmp_buf);
       
       wfile.close();
@@ -628,6 +628,198 @@ bool Logging::TableZone(FILE* stream_file, time_t start, time_t end)
                      fprintf_P(stream_file, PSTR("\n\t\t\t\t\t ] \n\t\t\t\t } \n"));    // close the last zone if we emitted
 
         return true;
+}
+
+// emit sensor log as JSON
+bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char sensor_type, int sensor_id, char summary_type)
+{
+        char tmp_buf[MAX_LOG_RECORD_SIZE];
+        char *sensor_name;
+
+        if (start == 0)
+                start = nntpTimeServer.LocalNow();
+
+        end = max(start,end) + 24*3600;  // add 1 day to end time.
+
+        unsigned int    nyear, nyearend=year(end), nyearstart=year(start);
+        unsigned int    nmonth, nmend = month(end), nmstart=month(start);
+        unsigned int    ndayend = day(end), ndaystart=day(start);
+
+        char bFirstRow = true, bHeader = true;
+
+        for( nyear=nyearstart; nyear<=nyearend; nyear++ )
+        {
+            for( nmonth=nmstart; nmonth<=nmend; nmonth++ )
+            {
+
+                SdFile lfile;
+
+                if( sensor_type == SENSOR_TYPE_TEMPERATURE )
+                {
+                       sprintf_P(tmp_buf, PSTR(TEMPERATURE_LOG_FNAME_FORMAT), nmonth, nyear%100, sensor_id );
+                       sensor_name = PSTR("Temperature");
+                }
+                else if( sensor_type == SENSOR_TYPE_PRESSURE )
+                {
+                       sprintf_P(tmp_buf, PSTR(PRESSURE_LOG_FNAME_FORMAT), nmonth, nyear%100, sensor_id );
+                       sensor_name = PSTR("Air Pressure");
+                }
+                else if( sensor_type == SENSOR_TYPE_HUMIDITY )
+                {
+                       sprintf_P(tmp_buf, PSTR(HUMIDITY_LOG_FNAME_FORMAT), nmonth, nyear%100, sensor_id );
+                       sensor_name = PSTR("Humidity");
+                }
+                else  
+                {
+                     trace(F("EmitSensorLog - requested sensor type not recognized\n"));
+                     return false;
+                }
+
+                if( lfile.open(tmp_buf, O_READ) )  // logs for each zone are stored in a separate file, with the file name based on the year and sensor ID. Try to open it.
+                {
+
+// OK, we opened the data file. Skip the first line (headers), and start reading the data.
+
+                    fprintf_P(stream_file, PSTR("series: ["));   // JSON opening 
+                
+                    long int  sensor_sum = 0;
+                    long int  sensor_c = 0;
+                    int          sensor_stamp = -1;
+                    
+                     lfile.fgets(tmp_buf, MAX_LOG_RECORD_SIZE);  // skip first line in the file - column headers
+
+// OK, we opened required watering log file. Iterate over records, filtering out necessary dates range
+                  
+                     while( lfile.available() ){
+
+                            int  nday = 0, nhour = 0, nminute = 0;
+                            int  sensor_reading = 0;
+
+                            int bytes = lfile.fgets(tmp_buf, MAX_LOG_RECORD_SIZE);
+                            if (bytes <= 0)
+                                       break;
+
+// Parse the string into fields. First field (up to two digits) is the day of the month
+
+                            sscanf_P( tmp_buf, PSTR("%u,%u:%u,%d"),
+                                                            &nday, &nhour, &nminute, &sensor_reading);
+
+                            if( (nmonth > nmend) || ((nmonth == nmend) && (nday > ndayend)) )    // check for the end date
+                                         break;
+
+                            if( (nmonth > nmstart) || ((nmonth == nmstart) && (nday >= ndaystart) )  ){        // the record is within required range. nmonth is the month, nday is the day of the month, xzone is the zone we are currently emitting
+
+// we have something to output.
+
+                                    if( bHeader ){
+                                      
+                                         fprintf_P(stream_file, PSTR("{\n\t\t\t name: \"%S readings, Sensor: %d\", \n\t\t\t\t data: [\n"), sensor_name, sensor_id);   // JSON series header
+                                         bHeader = false;
+                                         bFirstRow = true;
+                                    }
+
+                                    if( summary_type == LOG_SUMMARY_HOUR )
+                                    {
+                                           if( sensor_stamp == -1 )    // this is the very first record, start generating summary
+                                           {
+                                                 sensor_sum = sensor_reading;
+                                                 sensor_c      = 1;
+                                                 sensor_stamp = nhour;
+                                           }
+                                           else if( sensor_stamp == nhour )   // continue accumulation current sum
+                                           {                                             
+                                                 sensor_sum += sensor_reading;
+                                                 sensor_c++;
+                                           }
+                                           else   // close previous sum and start a new one
+                                           {
+                                                int sensor_average = int(sensor_sum/sensor_c);
+                                                
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+                                                                                              bFirstRow ? "":",",
+                                                                                              nyear, nmonth-1, nday, sensor_stamp, 0, sensor_average );   // note: month should be in JavaScript format (starting from 0)
+                                                bFirstRow = false;
+   
+                                                 sensor_sum = sensor_reading;   // start new sum
+                                                 sensor_c      = 1;
+                                                 sensor_stamp = nhour;
+                                           }
+                                    }
+                                    else if( summary_type == LOG_SUMMARY_DAY )
+                                    {
+                                           if( sensor_stamp == -1 )    // this is the very first record, start generating summary
+                                           {
+                                                 sensor_sum = sensor_reading;
+                                                 sensor_c      = 1;
+                                                 sensor_stamp = nday;
+                                           }
+                                           else if( sensor_stamp == nday )   // continue accumulation current sum
+                                           {                                             
+                                                 sensor_sum += sensor_reading;
+                                                 sensor_c++;
+                                           }
+                                           else   // close previous sum and start a new one
+                                           {
+                                                int sensor_average = (int)(sensor_sum/sensor_c);
+                                                
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+                                                                                              bFirstRow ? "":",",
+                                                                                              nyear, nmonth-1, sensor_stamp, 0, 0, sensor_average );   // note: month should be in JavaScript format (starting from 0)
+                                                bFirstRow = false;
+   
+                                                 sensor_sum = sensor_reading;   // start new sum
+                                                 sensor_c      = 1;
+                                                 sensor_stamp = nday;
+                                           }
+                                    }
+                                    else if( summary_type == LOG_SUMMARY_MONTH )
+                                    {
+                                           if( sensor_stamp == -1 )    // this is the very first record, start generating summary
+                                           {
+                                                 sensor_sum = sensor_reading;
+                                                 sensor_c      = 1;
+                                                 sensor_stamp = nmonth;
+                                           }
+                                           else if( sensor_stamp == nmonth )   // continue accumulation current sum
+                                           {                                             
+                                                 sensor_sum += sensor_reading;
+                                                 sensor_c++;
+                                           }
+                                           else   // close previous sum and start a new one
+                                           {
+                                                int sensor_average = int(sensor_sum/sensor_c);
+                                                
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+                                                                                              bFirstRow ? "":",",
+                                                                                              nyear, sensor_stamp-1, 0, 0, 0, sensor_average );   // note: month should be in JavaScript format (starting from 0)
+                                                bFirstRow = false;
+   
+                                                 sensor_sum = sensor_reading;   // start new sum
+                                                 sensor_c      = 1;
+                                                 sensor_stamp = nmonth;
+                                           }
+                                    }
+                                    else  
+                                    {  // no summarization, just output readings as-is
+                                    
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+                                                                                              bFirstRow ? "":",",
+                                                                                              nyear, nmonth-1, nday, nhour, nminute, sensor_reading );   // note: month should be in JavaScript format (starting from 0)
+                                                bFirstRow = false;
+                                    }
+                            }  
+                     }   // while
+                     lfile.close();
+                }  // file open
+            }  //for( nmonth=nmstart; nmonth<=nmend; nmonth++ )
+        }  //for( nyear=nyearstart; nyear<=nyearend; nyear++ )
+
+        if( !bHeader )   // header flag was reset, it means we output at least one line
+        {
+               fprintf_P(stream_file, PSTR("\n\t\t\t\t ] \n \t }]\n"));
+        }
+
+    return true; 
 }
 
 

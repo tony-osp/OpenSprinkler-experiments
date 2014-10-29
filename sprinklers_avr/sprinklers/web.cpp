@@ -263,6 +263,54 @@ static void ShowWateringLogs(char *sPage, FILE * pFile, EthernetClient client)
    }
 }
 
+// Query sensor readings
+
+static void JSONSensor(const KVPairs & key_value_pairs, FILE * stream_file)
+{
+	ServeHeader(stream_file, 200, PSTR("OK"), false, PSTR("text/plain"));
+	fprintf_P(stream_file, PSTR("{\n"));
+
+	time_t sdate = 0;
+	time_t edate = 0;
+        char  sensor_type = 0;
+        int     sensor_id     = 0;
+        char  summary_type = LOG_SUMMARY_NONE;
+
+	// Iterate through the kv pairs and search for the start and end dates.
+	for (int i = 0; i < key_value_pairs.num_pairs; i++)
+	{
+		const char * key = key_value_pairs.keys[i];
+		const char * value = key_value_pairs.values[i];
+		if (strcmp_P(key, PSTR("sdate")) == 0)
+		{
+			sdate = strtol(value, 0, 10);
+		}
+		else if (strcmp_P(key, PSTR("edate")) == 0)
+		{
+			edate = strtol(value, 0, 10);
+		}
+		else if (strcmp_P(key, PSTR("type")) == 0)
+		{
+			sensor_type = atoi(value);
+		}
+		else if (strcmp_P(key, PSTR("id")) == 0)
+		{
+			sensor_id = atoi(value);
+		}
+		else if (strcmp_P(key, PSTR("sum")) == 0)
+		{
+			if (value[0] == 'd')
+				summary_type = LOG_SUMMARY_DAY;
+			else if (value[0] == 'h')
+				summary_type = LOG_SUMMARY_HOUR;
+			else if (value[0] == 'm')
+				summary_type = LOG_SUMMARY_MONTH;
+		}
+	}
+
+	sdlog.EmitSensorLog(stream_file, sdate, edate, sensor_type, sensor_id, summary_type);
+	fprintf_P(stream_file, PSTR("}"));
+}
 
 static void JSONLogs(const KVPairs & key_value_pairs, FILE * stream_file)
 {
@@ -916,9 +964,9 @@ void web::ProcessWebClients()
 
                         if( strncmp_P(sPage, PSTR("bin/"), 4) == 0 )       // We do the check in two phases. 
                                                                                                       // First we check that the URL starts with "bin/" to identify the block of bin requests, 
-                                                                                                      // and then each request in the block checks the rest of the URL to determine specific request
+                                                                                                      // and then we check for a specific request in the bin/ block
                                                                                                       //
-                                                                                                      // This optimization speeds up request decoding, allowing to reduce the number of strcmp() each request goes through
+                                                                                                      // This optimization speeds up request decoding, allowing to reduce the number of strcmp() each request goes through as well as the string lengh to check
                                                                                                       //
                         {
                              char *xP4 = sPage + 4;
@@ -1045,7 +1093,16 @@ void web::ProcessWebClients()
 				     JSONtLogs(key_value_pairs, pFile);
 			     }
 #endif //LOGGING
+
+// Sensors
+			     else if (strcmp_P(xP5, PSTR("sens")) == 0)
+			     {
+			 	      JSONSensor(key_value_pairs, pFile);
+			     }
+
                         }
+// simple scheduling debug requests, enable when required (to reduce unnecessary overhead on each web request)
+#ifdef SCHEDULE_WEB_DEBUG
 			else if (strcmp_P(sPage, PSTR("ShowSched")) == 0)
 			{
 				freeMemory();
@@ -1065,6 +1122,8 @@ void web::ProcessWebClients()
 				ReloadEvents(true);
 				ServeEventPage(pFile);
 			}
+#endif  // SCHEDULE_WEB_DEBUG
+
 // access system logs directory
 			else if (strncmp_P(sPage, PSTR("logs"), 4) == 0)
 			{

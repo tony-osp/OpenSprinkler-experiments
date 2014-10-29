@@ -52,7 +52,7 @@ limitations under the License.
 #define SENSOR_ENABLE_BMP180  1
 
 // default repeat intervals, in minutes
-#define SENSORS_PRESSURE_DEFAULT_REPEAT 30
+#define SENSORS_PRESSURE_DEFAULT_REPEAT 60
 
 class Sensors {
 public:

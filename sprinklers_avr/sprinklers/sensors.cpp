@@ -48,19 +48,6 @@ SFE_BMP180 bmp180;
 // maximum ulong value
 #define MAX_ULONG       4294967295
 
-// Helper inline function
-//
-// Subtract two millis values and return delta
-// Takes into account counter rollover
-//
-inline unsigned long subt_millis(unsigned long new_millis, unsigned long old_millis)
-{
-  if( new_millis > old_millis ) return (new_millis-old_millis); // main case - new is bigger than old
-
-  unsigned long delta = MAX_ULONG - old_millis; delta += new_millis;    // do math in two steps to ensure no overflow
-  return delta;
-}
-
 // local forward declarations
 
 char pressure_MinTimer(void);
@@ -95,8 +82,8 @@ byte Sensors::loop(void)
        unsigned long  new_millis = millis();    // Note: we are using built-in Arduino millis() function instead of now() or time-zone adjusted LocalNow(), because it is a lot faster
                                                                   // and for detecting minutes changes it does not make any difference.
 
-//       if( subt_millis(new_millis, old_millis) >= 10000 ){   // for now let's make it 10 sec
-       if( subt_millis(new_millis, old_millis) >= 60000 ){   // one minute detection
+//       if( (new_millis - old_millis) >= 10000 ){   // for now let's make it 10 sec
+       if( (new_millis - old_millis) >= 60000 ){   // one minute detection
 
              old_millis = new_millis;
              
@@ -112,11 +99,13 @@ char pressure_MinTimer(void)
 {
 #ifdef SENSOR_ENABLE_BMP180
 
-     static char minutesCounter = SENSORS_PRESSURE_DEFAULT_REPEAT;
+     static int  minutesCounter = SENSORS_PRESSURE_DEFAULT_REPEAT;
      static char pressure_defaultRepeat = SENSORS_PRESSURE_DEFAULT_REPEAT;
      
      int  pressure, temperature;
-    
+
+//     trace(F("Pressure repeat timer fired. Min=%d, minutesCounter=%d\n"), minute(now()), minutesCounter);
+     
      minutesCounter--;
      if( minutesCounter == 0 ){  // required repeat interval check
     
