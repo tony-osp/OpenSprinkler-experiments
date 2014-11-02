@@ -647,12 +647,18 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
 
         char bFirstRow = true, bHeader = true;
 
+//  trace(F("EmitSensorLog - entering, nyearstart=%d, nmstart=%d, ndaystart=%d, nyearend=%d, nmend=%d, ndayend=%d\n"), nyearstart, nmstart, ndaystart, nyearend, nmend, ndayend );
+
+        fprintf_P(stream_file, PSTR("\"series\": ["));   // JSON opening header
+
         for( nyear=nyearstart; nyear<=nyearend; nyear++ )
         {
-            for( nmonth=nmstart; nmonth<=nmend; nmonth++ )
+          for( nmonth=nmstart; nmonth<=nmend; nmonth++ )
             {
 
                 SdFile lfile;
+
+//  trace(F("EmitSensorLog - processing month=%d\n"), nmonth );
 
                 if( sensor_type == SENSOR_TYPE_TEMPERATURE )
                 {
@@ -678,15 +684,13 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                 if( lfile.open(tmp_buf, O_READ) )  // logs for each zone are stored in a separate file, with the file name based on the year and sensor ID. Try to open it.
                 {
 
-// OK, we opened the data file. Skip the first line (headers), and start reading the data.
-
-                    fprintf_P(stream_file, PSTR("series: ["));   // JSON opening 
+// OK, we opened the data file.
                 
                     long int  sensor_sum = 0;
                     long int  sensor_c = 0;
                     int          sensor_stamp = -1;
                     
-                     lfile.fgets(tmp_buf, MAX_LOG_RECORD_SIZE);  // skip first line in the file - column headers
+                    lfile.fgets(tmp_buf, MAX_LOG_RECORD_SIZE);  // skip first line in the file - column headers
 
 // OK, we opened required watering log file. Iterate over records, filtering out necessary dates range
                   
@@ -713,7 +717,7 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
 
                                     if( bHeader ){
                                       
-                                         fprintf_P(stream_file, PSTR("{\n\t\t\t name: \"%S readings, Sensor: %d\", \n\t\t\t\t data: [\n"), sensor_name, sensor_id);   // JSON series header
+                                         fprintf_P(stream_file, PSTR("{\n\t\t\t \"name\": \"%S readings, Sensor: %d\", \n\t\t\t\t \"data\": [\n"), sensor_name, sensor_id);   // JSON series header
                                          bHeader = false;
                                          bFirstRow = true;
                                     }
@@ -734,10 +738,11 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                            else   // close previous sum and start a new one
                                            {
                                                 int sensor_average = int(sensor_sum/sensor_c);
-                                                
-                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+
+                                                tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = sensor_stamp;  tm.Minute = 0;  tm.Second = 0;
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ %lu000, %d ]"),
                                                                                               bFirstRow ? "":",",
-                                                                                              nyear, nmonth-1, nday, sensor_stamp, 0, sensor_average );   // note: month should be in JavaScript format (starting from 0)
+                                                                                              makeTime(tm), sensor_average );   // note: month should be in JavaScript format (starting from 0)
                                                 bFirstRow = false;
    
                                                  sensor_sum = sensor_reading;   // start new sum
@@ -762,9 +767,11 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                            {
                                                 int sensor_average = (int)(sensor_sum/sensor_c);
                                                 
-                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+                                                tmElements_t tm;   tm.Day = sensor_stamp;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = 0;  tm.Minute = 0;  tm.Second = 0;
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ %lu000, %d ]"),
                                                                                               bFirstRow ? "":",",
-                                                                                              nyear, nmonth-1, sensor_stamp, 0, 0, sensor_average );   // note: month should be in JavaScript format (starting from 0)
+                                                                                              makeTime(tm), sensor_average );   // note: month should be in JavaScript format (starting from 0)
+
                                                 bFirstRow = false;
    
                                                  sensor_sum = sensor_reading;   // start new sum
@@ -788,10 +795,11 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                            else   // close previous sum and start a new one
                                            {
                                                 int sensor_average = int(sensor_sum/sensor_c);
-                                                
-                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+
+                                                tmElements_t tm;   tm.Day = 0;  tm.Month = sensor_stamp; tm.Year = nyear - 1970;  tm.Hour = 0;  tm.Minute = 0;  tm.Second = 0;
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ %lu000, %d ]"),
                                                                                               bFirstRow ? "":",",
-                                                                                              nyear, sensor_stamp-1, 0, 0, 0, sensor_average );   // note: month should be in JavaScript format (starting from 0)
+                                                                                              makeTime(tm), sensor_average );  
                                                 bFirstRow = false;
    
                                                  sensor_sum = sensor_reading;   // start new sum
@@ -801,10 +809,12 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                     }
                                     else  
                                     {  // no summarization, just output readings as-is
-                                    
-                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ Date.UTC(%u, %u, %u, %u, %u, 0, 0), %d ]"),
+
+                                                tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = nhour;  tm.Minute = nminute;  tm.Second = 0;
+                                                fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ %lu000, %d ]"),
                                                                                               bFirstRow ? "":",",
-                                                                                              nyear, nmonth-1, nday, nhour, nminute, sensor_reading );   // note: month should be in JavaScript format (starting from 0)
+                                                                                              makeTime(tm), sensor_reading );  
+                                    
                                                 bFirstRow = false;
                                     }
                             }  
