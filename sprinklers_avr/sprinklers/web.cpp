@@ -85,12 +85,11 @@ static int stream_putchar(char c, FILE *stream)
 
 static void ServeHeader(FILE * stream_file, int code, const char * pReason, bool cache, char * type)
 {
-	fprintf_P(stream_file, PSTR("HTTP/1.1 %d %S\nContent-Type: %S\n"), code, pReason, type);
+	fprintf_P(stream_file, PSTR("HTTP/1.1 %d %S\nContent-Type: %S\nConnection: close\n"), code, pReason, type);
 	if (cache)
-		fprintf_P(stream_file, PSTR("Last-Modified: Fri, 02 Jun 2006 09:46:32 GMT\nExpires: Sun, 17 Jan 2038 19:14:07 GMT\n"));
+		fprintf_P(stream_file, PSTR("Last-Modified: Fri, 02 Jun 2006 09:46:32 GMT\nExpires: Sun, 17 Jan 2038 19:14:07 GMT\r\n\r\n"));
 	else
-		fprintf_P(stream_file, PSTR("Cache-Control: no-cache\n"));
-	fputc('\n', stream_file);
+		fprintf_P(stream_file, PSTR("Cache-Control: no-cache\r\n\r\n"));
 }
 
 static void ServeHeader(FILE * stream_file, int code, const char * pReason, bool cache)
