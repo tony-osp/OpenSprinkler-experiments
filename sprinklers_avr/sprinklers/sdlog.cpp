@@ -689,7 +689,10 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                     long int  sensor_sum = 0;
                     long int  sensor_c = 0;
                     int          sensor_stamp = -1;
-                    
+                    int          sensor_stamp_h, sensor_stamp_d, sensor_stamp_m, sensor_stamp_y;                    
+
+                    sensor_stamp_h = -1, sensor_stamp_d = sensor_stamp_m = sensor_stamp_y = -1;
+
                     lfile.fgets(tmp_buf, MAX_LOG_RECORD_SIZE);  // skip first line in the file - column headers
 
 // OK, we opened required watering log file. Iterate over records, filtering out necessary dates range
@@ -729,8 +732,9 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                                  sensor_sum = sensor_reading;
                                                  sensor_c      = 1;
                                                  sensor_stamp = nhour;
+                                                 sensor_stamp_d = nday;  sensor_stamp_m = nmonth; sensor_stamp_y = nyear;
                                            }
-                                           else if( sensor_stamp == nhour )   // continue accumulation current sum
+                                           else if( (sensor_stamp == nhour) && (sensor_stamp_d == nday) && (sensor_stamp_m == nmonth) && (sensor_stamp_y == nyear) )   // continue accumulation current sum
                                            {                                             
                                                  sensor_sum += sensor_reading;
                                                  sensor_c++;
@@ -739,7 +743,7 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                            {
                                                 int sensor_average = int(sensor_sum/sensor_c);
 
-                                                tmElements_t tm;   tm.Day = nday;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = sensor_stamp;  tm.Minute = 0;  tm.Second = 0;
+                                                tmElements_t tm;   tm.Day = sensor_stamp_d;  tm.Month = sensor_stamp_m; tm.Year = sensor_stamp_y - 1970;  tm.Hour = sensor_stamp;  tm.Minute = 0;  tm.Second = 0;
                                                 fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ %lu000, %d ]"),
                                                                                               bFirstRow ? "":",",
                                                                                               makeTime(tm), sensor_average );   // note: month should be in JavaScript format (starting from 0)
@@ -748,6 +752,7 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                                  sensor_sum = sensor_reading;   // start new sum
                                                  sensor_c      = 1;
                                                  sensor_stamp = nhour;
+                                                 sensor_stamp_d = nday;  sensor_stamp_m = nmonth; sensor_stamp_y = nyear;
                                            }
                                     }
                                     else if( summary_type == LOG_SUMMARY_DAY )
@@ -757,8 +762,9 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                                  sensor_sum = sensor_reading;
                                                  sensor_c      = 1;
                                                  sensor_stamp = nday;
+                                                 sensor_stamp_m = nmonth; sensor_stamp_y = nyear;
                                            }
-                                           else if( sensor_stamp == nday )   // continue accumulation current sum
+                                           else if( (sensor_stamp == nday) && (sensor_stamp_m == nmonth) && (sensor_stamp_y == nyear) )   // continue accumulation current sum
                                            {                                             
                                                  sensor_sum += sensor_reading;
                                                  sensor_c++;
@@ -767,7 +773,8 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                            {
                                                 int sensor_average = (int)(sensor_sum/sensor_c);
                                                 
-                                                tmElements_t tm;   tm.Day = sensor_stamp;  tm.Month = nmonth; tm.Year = nyear - 1970;  tm.Hour = 0;  tm.Minute = 0;  tm.Second = 0;
+                                                tmElements_t tm;   tm.Day = sensor_stamp;  tm.Month = sensor_stamp_m; tm.Year = sensor_stamp_y - 1970;  tm.Hour = 0;  tm.Minute = 0;  tm.Second = 0;
+
                                                 fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ %lu000, %d ]"),
                                                                                               bFirstRow ? "":",",
                                                                                               makeTime(tm), sensor_average );   // note: month should be in JavaScript format (starting from 0)
@@ -777,6 +784,7 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                                  sensor_sum = sensor_reading;   // start new sum
                                                  sensor_c      = 1;
                                                  sensor_stamp = nday;
+                                                 sensor_stamp_m = nmonth; sensor_stamp_y = nyear;
                                            }
                                     }
                                     else if( summary_type == LOG_SUMMARY_MONTH )
@@ -786,8 +794,9 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                                  sensor_sum = sensor_reading;
                                                  sensor_c      = 1;
                                                  sensor_stamp = nmonth;
+                                                 sensor_stamp_y = nyear;
                                            }
-                                           else if( sensor_stamp == nmonth )   // continue accumulation current sum
+                                           else if( (sensor_stamp == nmonth) && (sensor_stamp_y == nyear) )   // continue accumulation current sum
                                            {                                             
                                                  sensor_sum += sensor_reading;
                                                  sensor_c++;
@@ -796,7 +805,7 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                            {
                                                 int sensor_average = int(sensor_sum/sensor_c);
 
-                                                tmElements_t tm;   tm.Day = 0;  tm.Month = sensor_stamp; tm.Year = nyear - 1970;  tm.Hour = 0;  tm.Minute = 0;  tm.Second = 0;
+                                                tmElements_t tm;   tm.Day = 0;  tm.Month = sensor_stamp; tm.Year = sensor_stamp_y - 1970;  tm.Hour = 0;  tm.Minute = 0;  tm.Second = 0;
                                                 fprintf_P(stream_file, PSTR("%s \n\t\t\t\t\t [ %lu000, %d ]"),
                                                                                               bFirstRow ? "":",",
                                                                                               makeTime(tm), sensor_average );  
@@ -805,6 +814,7 @@ bool Logging::EmitSensorLog(FILE* stream_file, time_t start, time_t end, char se
                                                  sensor_sum = sensor_reading;   // start new sum
                                                  sensor_c      = 1;
                                                  sensor_stamp = nmonth;
+                                                 sensor_stamp_y = nyear;
                                            }
                                     }
                                     else  
